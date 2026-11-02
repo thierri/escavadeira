@@ -6,8 +6,8 @@ Textos da interface e comentários do código em **português**.
 
 Leia antes de mexer:
 - [`README.md`](README.md): o que o simulador faz, comandos, árvore de arquivos, `window.sim` no console.
-- [`docs/guia-diagramas-interativos.md`](docs/guia-diagramas-interativos.md): método e decisões de projeto
-  (layout 1920×1080, linguagem de cores, física, som, apresentação).
+- `documentacao/` (pasta local, fora do git, pode não existir): jornada do projeto, método para novas
+  máquinas, pipeline do vídeo, referência técnica, guia original e roteiro do vídeo.
 
 ## Rodar
 
@@ -31,7 +31,7 @@ Depois de editar, recarregue com Ctrl+F5 (o navegador pode guardar os módulos e
   manda pelo `controls.override`.
 - `js/present/scenes.js`: roteiro das cenas (`moves`, `notes`, `focus` por `data-comp`, `spots`). São 15
   cenas: a parte 1 (cenas 1–6) é um tour pela interface e a parte 2 (cenas 7–15) explica a máquina. O
-  roteiro de narração do vídeo está em [`docs/roteiro-video.md`](docs/roteiro-video.md); mude os dois juntos.
+  roteiro de narração do vídeo fica em `documentacao/anexos/roteiro-video.md` (local); mude os dois juntos.
 - **Holofote** (`spots` nas cenas, `setSpot` em `presentation.js`): uma moldura que escurece o resto do palco
   e aponta uma região. A região pode ser um nome (`'scene'`, `'panel'`, `'controls'`, `'topbar'`), um
   retângulo `[x, y, w, h]` em px de 1920×1080, ou `{ sel, i, pad }`, medido do DOM. Os eventos das cenas
