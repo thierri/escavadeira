@@ -21,17 +21,18 @@
         <button class="chip on" data-layer="labels">Nomes</button>
         <button class="chip on" data-layer="values">Valores</button>
       </div>
-      <div class="group" id="speed">
-        <span class="glabel">Velocidade</span>
-        <button class="chip" data-speed="0.25">¼×</button>
-        <button class="chip" data-speed="0.5">½×</button>
-        <button class="chip on" data-speed="1">1×</button>
-        <button class="chip" data-speed="2">2×</button>
-        <button class="chip" id="pause">Pausar</button>
-      </div>
       <div class="group" id="sound">
-        <span class="glabel">Som</span>
-        <button class="chip on" id="btn-sound">Ligado</button>
+        <button class="chip icon" id="btn-sound" aria-label="Som ligado (clique para silenciar)" title="Som ligado (clique para silenciar)">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/>
+            <g class="waves" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path d="M18 6.5a7.8 7.8 0 0 1 0 11"/>
+            </g>
+            <g class="mute" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>
+            </g>
+          </svg>
+        </button>
         <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
       </div>
       <div class="group right">

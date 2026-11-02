@@ -7,7 +7,7 @@ const lpm = (v) => `${fmt(v)} L/min`;
 export const INFO = {
   _intro: {
     t: 'Como usar',
-    d: '1) Ignição em <b>Ligado</b> e segure <b>Partida</b> (ou Enter). 2) Abaixe a <b>alavanca de segurança</b> (tecla L). 3) Mexa os joysticks com o mouse, teclado ou controle. Clique em qualquer peça da máquina para entender o que ela faz.',
+    d: '1) Gire a <b>chave de ignição</b> até <b>Partida</b> e segure até o motor pegar (ou segure Enter). 2) Mexa os joysticks com o mouse, teclado ou controle. Clique em qualquer peça da máquina para entender o que ela faz.',
   },
   engine: {
     t: 'Motor diesel',
@@ -31,7 +31,7 @@ export const INFO = {
   },
   lockValve: {
     t: 'Válvula de bloqueio do piloto',
-    d: 'Ligada à alavanca de segurança. Levantada, ela corta o óleo piloto: os joysticks podem ser mexidos à vontade e nada acontece. É o que impede a máquina de se mover quando o operador sobe ou desce da cabine.',
+    d: 'Nas máquinas reais ela é ligada à alavanca de segurança e corta o óleo piloto quando o operador sobe ou desce da cabine. Neste simulador ela fica sempre liberada.',
     live: (s) => [['Estado', s.locked ? 'TRAVADO' : 'liberado']],
   },
   tank: {
@@ -46,7 +46,7 @@ export const INFO = {
   },
   swingMotor: {
     t: 'Motor de giro',
-    d: 'Um motor hidráulico com redutor que gira a parte de cima sobre a coroa (o rolamento gigante). Na arrancada a pressão sobe muito para vencer a inércia; ao soltar o joystick, as válvulas freiam o giro.',
+    d: 'Um motor hidráulico com redutor que gira a parte de cima sobre a coroa (o rolamento gigante). Neste simulador 2D o giro está desabilitado: vemos a máquina sempre de lado.',
     live: (s) => [['Velocidade', `${fmt((s.swing.w * 60) / (2 * Math.PI), 1)} rpm`], ['Pressão', bar(Math.max(s.f.swing.pA, s.f.swing.pB))]],
   },
   swivel: {
@@ -56,12 +56,12 @@ export const INFO = {
   },
   travelMotor: {
     t: 'Motores de translação',
-    d: 'Cada esteira tem seu próprio motor hidráulico na roda motriz traseira. Movendo as duas alavancas para frente a máquina anda; uma só faz a máquina virar; em sentidos opostos ela gira no próprio eixo (e a pressão vai lá em cima).',
+    d: 'Cada esteira tem seu próprio motor hidráulico na roda motriz traseira. Neste simulador as duas alavancas andam juntas: para frente a máquina avança, para trás ela recua.',
     live: (s) => [['Esquerda', `${fmt(s.trackV[0] * 3.6, 1)} km/h`], ['Direita', `${fmt(s.trackV[1] * 3.6, 1)} km/h`]],
   },
   tracks: {
     t: 'Esteiras e chassi inferior',
-    d: 'Distribuem o peso de ~20 toneladas no chão e dão estabilidade para cavar. Quando a parte de cima gira, nesta vista lateral as esteiras parecem "encurtar": estamos vendo elas de lado ou de frente.',
+    d: 'Distribuem o peso de ~20 toneladas no chão e dão estabilidade para cavar. Nesta vista lateral em corte a máquina só anda para frente e para trás.',
   },
   boomCyl: {
     t: 'Cilindros da lança (2)',

@@ -183,7 +183,7 @@ function prep(st, o) {
     st.pilot.supply = P.pilotBar;
     st.oil.T = 48;
   }
-  st.locked = o.locked ?? false;
+  st.locked = false;   // sem alavanca de segurança neste simulador
 }
 
 function div(parent, cls) {

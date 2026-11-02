@@ -116,7 +116,7 @@ export class Panel {
 
     // luzes de aviso
     const lights = [
-      ['lock', 'TRAVA'], ['relief0', 'ALÍVIO P1'], ['relief1', 'ALÍVIO P2'], ['lug', 'MOTOR FORÇADO'],
+      ['idle', 'LENTA AUTO'], ['relief0', 'ALÍVIO P1'], ['relief1', 'ALÍVIO P2'], ['lug', 'MOTOR FORÇADO'],
       ['hot', 'ÓLEO QUENTE'], ['cav', 'CAVITAÇÃO'], ['lowOil', 'NÍVEL BAIXO'], ['stall', 'MOTOR APAGOU'],
     ];
     this.lights = {};
@@ -163,7 +163,7 @@ export class Panel {
     const ry = c.y + c.h - ((st.pumps[0].reliefSet || st.params.reliefBar) / 400) * c.h;
     this.chRelief.setAttribute('y1', ry); this.chRelief.setAttribute('y2', ry);
 
-    const colors = { lock: '#f59e0b', relief0: '#d62828', relief1: '#d62828', lug: '#f59e0b', hot: '#d62828', cav: '#d62828', lowOil: '#d62828', stall: '#d62828' };
+    const colors = { idle: '#f59e0b', relief0: '#d62828', relief1: '#d62828', lug: '#f59e0b', hot: '#d62828', cav: '#d62828', lowOil: '#d62828', stall: '#d62828' };
     for (const id in this.lights) {
       const on = !!st.alerts[id];
       const L = this.lights[id];

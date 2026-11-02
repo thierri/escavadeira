@@ -8,7 +8,7 @@
 //   prep            estado inicial (motor ligado?, pose em graus [lança, braço, caçamba], acelerador…)
 //   moves           [início (s), duração (s), { boom, arm, bucket, swing, tl, tr, start, boost }]
 //                   valores de -1 a 1: boom + = sobe · arm + = recolhe · bucket + = enche
-//                   swing + = direita · tl/tr = esteiras · start/boost = segurar botão
+//                   swing: desabilitado (vista 2D) · tl/tr = esteiras (sempre juntas) · start/boost = segurar botão
 //   events          [instante (s), função(st, params)] para mudanças pontuais
 //   notes           [instante (s), texto] troca o texto da legenda durante a cena
 //   duration        duração total (s); no modo automático avança sozinho ao final
@@ -32,11 +32,10 @@ export const SCENES = [
     text: 'Girando a chave, o motor de partida faz o diesel pegar. O motor gira duas bombas de pistões (P1 e P2) e uma bomba piloto pequena.',
     ui: 'full', cam: { cx: X(-0.85), cy: Y(2.05), w: 600 },
     focus: ['engine', 'pumps', 'pilotPump', 'hoseSuction', 'hosePump', 'tank'], insets: [], layers: { labels: true, values: true },
-    prep: { running: false, throttle: 4, pose: [16, -104, -67], locked: true },
+    prep: { running: false, throttle: 4, pose: [16, -104, -67] },
     events: [
       [1, (st) => { st.key = 1; }],
       ...[5, 6, 7, 8, 9, 10].map((v, i) => [6 + i * 0.35, (st) => { st.throttle = v; }]),
-      [9.5, (st) => { st.locked = false; }],
     ],
     moves: [[2.5, 1.4, { start: 1 }], [10.5, 3.5, { boom: 1 }], [14.5, 2.5, { boom: -1 }]],
     notes: [
@@ -60,14 +59,13 @@ export const SCENES = [
   },
   {
     title: 'O comando: joystick, piloto e válvulas',
-    text: 'Com a alavanca de segurança levantada, mexer no joystick não faz nada: o óleo piloto (roxo) está cortado.',
+    text: 'O joystick não move a máquina diretamente: ele manda óleo piloto (roxo), de baixa pressão, para o bloco de válvulas.',
     ui: 'full', cam: { cx: X(1.6), cy: Y(2.3), w: 920 },
     focus: ['cab', 'lockValve', 'hosePilot', 'valve', 'pilotPump'], insets: ['valve'], layers: { labels: true, values: false },
-    prep: { running: true, throttle: 7, pose: [16, -104, -67], locked: true },
-    events: [[5.5, (st) => { st.locked = false; }]],
+    prep: { running: true, throttle: 7, pose: [16, -104, -67] },
     moves: [[2, 2.5, { boom: 1 }], [7, 2.5, { boom: 1 }], [10.5, 2.5, { bucket: -0.45 }], [13.5, 2.5, { boom: -1 }]],
     notes: [
-      [5.5, 'Alavanca abaixada: o joystick manda óleo piloto, que empurra o carretel no bloco de válvulas (veja o detalhe no canto).'],
+      [2, 'O óleo piloto empurra o carretel no bloco de válvulas (veja o detalhe no canto), que abre caminho para o óleo da bomba.'],
       [10.5, 'Joystick pela metade, carretel pela metade: passa menos óleo e o movimento fica mais lento. É assim que o operador dosa a velocidade.'],
     ],
     duration: 17,
@@ -106,30 +104,16 @@ export const SCENES = [
     duration: 18,
   },
   {
-    title: 'O giro e a junta rotativa',
-    text: 'Um motor hidráulico com redutor gira toda a parte de cima sobre um rolamento gigante.',
-    ui: 'clean', cam: { cx: 600, cy: 360, w: 1300 }, capPos: 'left',
-    focus: ['swingMotor', 'swivel', 'planView', 'hoseWork-swing'], insets: ['plan'], layers: { labels: true, values: false },
-    prep: { running: true, throttle: 8, pose: [30, -100, -90] },
-    moves: [[1.5, 2.5, { swing: 1 }], [7, 2.5, { swing: -1 }]],
-    notes: [
-      [1.5, 'Na arrancada a pressão sobe muito para vencer a inércia. Nesta vista lateral, as esteiras parecem encurtar: estamos vendo elas de outro ângulo.'],
-      [7, 'A junta rotativa, no centro, deixa o óleo descer até as esteiras mesmo com a máquina girando sem parar.'],
-    ],
-    duration: 12.5,
-  },
-  {
     title: 'Andando sobre as esteiras',
     text: 'Cada esteira tem seu próprio motor hidráulico na roda traseira. As duas alavancas para frente: a máquina anda.',
     ui: 'clean', cam: (sc) => ({ cx: sc.X(1.6), cy: 410, w: 1150 }),
     focus: ['travelMotor', 'tracks', 'swivel', 'planView', 'hoseWork-travelL', 'hoseWork-travelR'], insets: ['plan'], layers: { labels: true, values: false },
     prep: { running: true, throttle: 9, pose: [30, -100, -90] },
-    moves: [[1.5, 2.6, { tl: 0.55, tr: 0.55 }], [5.5, 2.6, { tl: -0.55, tr: -0.55 }], [9, 2.6, { tl: 0.7, tr: -0.7 }]],
+    moves: [[1.5, 2.6, { tl: 0.55, tr: 0.55 }], [5.5, 2.6, { tl: -0.55, tr: -0.55 }]],
     notes: [
       [5.5, 'Para trás: o óleo entra pelo outro lado dos motores.'],
-      [9, 'Uma esteira para frente e a outra para trás: a máquina gira no próprio lugar (veja a vista de cima).'],
     ],
-    duration: 13,
+    duration: 9.5,
   },
   {
     title: 'A válvula de alívio: o limite de segurança',
@@ -146,7 +130,7 @@ export const SCENES = [
   },
   {
     title: 'Tudo junto: um ciclo de escavação',
-    text: 'Abrir, descer, puxar, encher, levantar, girar, descarregar, voltar. Um operador experiente faz isso em menos de 20 segundos.',
+    text: 'Abrir, descer, puxar, encher, levantar, descarregar, voltar. Um operador experiente faz isso em menos de 20 segundos.',
     ui: 'full', cam: { cx: 760, cy: 392, w: 1400 },
     focus: [], insets: ['plan'], layers: { labels: false, values: false },
     prep: { running: true, throttle: 9, pose: [28, -104, -67] },
@@ -156,15 +140,14 @@ export const SCENES = [
       [4.6, 2.6, { arm: 1, bucket: 0.6 }],
       [7.3, 1.0, { bucket: 1 }],
       [8.4, 3.8, { boom: 1 }],
-      [10.4, 2.5, { swing: 1 }],
       [13.4, 1.6, { bucket: -1, arm: -0.4 }],
-      [15.4, 2.3, { swing: -1, bucket: 0.5 }],
+      [15.4, 2.3, { bucket: 0.5 }],
       [18.2, 2.2, { boom: -0.7, arm: 0.3 }],
     ],
     notes: [
       [4.6, 'Puxar o braço e fechar a caçamba: é aqui que a pressão sobe e o motor faz força.'],
-      [8.4, 'Levantar e girar ao mesmo tempo: as duas bombas trabalham em paralelo.'],
-      [13.4, 'Descarregar no lado. Depois, girar de volta e recomeçar.'],
+      [8.4, 'Levantar com a caçamba cheia: as duas bombas trabalham juntas.'],
+      [13.4, 'Descarregar e recomeçar.'],
     ],
     duration: 21.5,
   },

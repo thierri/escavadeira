@@ -45,7 +45,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #151922; fon
 
 .lbl-t { font: 600 14px var(--font); fill: var(--ink); paint-order: stroke; stroke: #fbfaf6; stroke-width: 4px; stroke-linejoin: round; }
 .inset-t { font: 700 11px var(--font); letter-spacing: .08em; fill: var(--muted); }
+.pump-tag { font: 800 10px var(--font); fill: var(--ink); paint-order: stroke; stroke: #fbfaf6; stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
 .inset-s { font: 500 12px var(--font); fill: #4b5563; }
+.inset-s.off { opacity: .45; }
 .inset-s.on { font-weight: 800; fill: #b45309; }
 .inset-v { font: 600 12px var(--font); fill: var(--ink); font-variant-numeric: tabular-nums; }
 .val-t { font: 600 12.5px var(--font); fill: #fff; font-variant-numeric: tabular-nums; }
@@ -101,19 +103,14 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .btn small { font-weight: 500; color: inherit; opacity: .7; font-size: 11px; }
 .btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .btn.wide { width: 100%; margin-top: 8px; }
-.keysw { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 6px; }
-.keysw .btn { padding: 10px; }
-.keysw .btn:nth-child(3).on { background: #d97706; border-color: #d97706; }
-.seg { display: flex; gap: 4px; width: 100%; }
-.seg .btn { flex: 1; padding: 7px 4px; }
+.ignkey { touch-action: none; cursor: grab; overflow: visible; }
+.key-l { font: 700 10px var(--font); fill: #6b7280; letter-spacing: .02em; }
+.key-l.on { fill: var(--ink); }
 .pad-l { font: 600 11px var(--font); fill: #4b5563; }
 .knob { cursor: ns-resize; touch-action: none; }
 .knob-t { font: 800 22px var(--font); fill: #fff; }
 .pad, .lever { touch-action: none; cursor: grab; }
 .sub { font: 500 12px var(--font); color: var(--muted); }
-.lock { cursor: pointer; }
-.lock-t { font: 800 12px var(--font); color: #16a34a; cursor: pointer; text-align: center; }
-.lock-t.locked { color: #d62828; }
 .hint { font: 500 11px var(--font); color: #9ca3af; margin-top: 2px; }
 .levers { display: flex; gap: 8px; }
 .info { align-items: stretch; }
@@ -124,7 +121,11 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .live em { font-style: normal; font-weight: 500; color: var(--muted); margin-right: 6px; }
 
 #vol { width: 110px; accent-color: var(--accent); }
-#btn-sound.wait { background: #d97706; color: #fff; border-color: #d97706; }
+.chip.icon { display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px; }
+#btn-sound .mute { display: none; }
+#btn-sound.muted .mute { display: inline; }
+#btn-sound.muted .waves { display: none; }
+#btn-sound.muted { opacity: .7; }
 
 /* ---------- camada fixa de insets ---------- */
 #overlay { position: absolute; left: 0; top: 56px; pointer-events: none; }
