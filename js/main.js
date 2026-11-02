@@ -47,11 +47,11 @@ function reset() {
 document.getElementById('btn-reset').onclick = reset;
 
 // camadas
-document.querySelectorAll('[data-layer]').forEach((b) => {
+document.querySelectorAll('[data-show]').forEach((b) => {
   b.onclick = () => {
     const on = !b.classList.contains('on');
     b.classList.toggle('on', on);
-    scene.setLayer(b.dataset.layer, on);
+    scene.setLayer(b.dataset.show, on);
   };
 });
 // velocidade / pausa
@@ -92,7 +92,7 @@ vol.addEventListener('keydown', (e) => e.stopPropagation());
 function setLayers(obj) {
   for (const k in obj) {
     scene.setLayer(k, obj[k]);
-    const b = document.querySelector(`[data-layer="${k}"]`);
+    const b = document.querySelector(`[data-show="${k}"]`);
     if (b) b.classList.toggle('on', obj[k]);
   }
 }
@@ -101,33 +101,47 @@ const pres = new Presentation({
   st: () => st,
   reset,
   togglePause: () => { paused = !paused; },
+  showDrawer: (on) => { drawer.toggle(on); document.getElementById('btn-params').classList.toggle('on', on); },
+  resetFx: () => resetFx(),
 });
 document.getElementById('btn-present').onclick = () => {
   if (drawer.open) { drawer.toggle(false); document.getElementById('btn-params').classList.remove('on'); }
   pres.start(0);
 };
 
-// laço principal: física em passo fixo (240 Hz), desenho a cada quadro
+// laço principal: física em passo fixo (240 Hz), desenho a cada quadro.
+// tick(dt, scriptDt) avança um quadro; scriptDt é o relógio do roteiro da
+// apresentação (no vídeo ele pode andar mais rápido ou mais devagar que dt).
 const H = 1 / 240;
 let acc = 0, last = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  pres.update(paused ? 0 : dt * speed, dt);
+function tick(dt, scriptDt = dt) {
+  pres.update(paused ? 0 : scriptDt * speed, dt);
   controls.update(dt);
   if (!paused) {
     acc += dt * speed;
     let n = 0;
-    while (acc >= H && n < 120) { step(st, H); acc -= H; n++; }
+    while (acc >= H - 1e-9 && n < 120) { step(st, H); acc -= H; n++; }
   }
   const vdt = paused ? 0 : dt * speed;
   scene.update(st, vdt);
   panel.update(st, dt);
   info.panel.update(st);
   sound.update(st, paused ? 0 : dt * speed, paused);
+}
+function frame(now) {
+  tick(Math.min(0.05, (now - last) / 1000));
+  last = now;
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+// Modo vídeo (?video): sem laço próprio; quem grava chama sim.tick() quadro a quadro.
+const VIDEO = new URLSearchParams(location.search).has('video') || window.__VIDEO_MODE === true;
+if (!VIDEO) requestAnimationFrame(frame);
+
+// zera tudo o que é só visual (fumaça, bolhas, gráfico, ponteiros, joysticks)
+function resetFx() {
+  acc = 0;
+  scene.resetFx(); panel.resetFx(); controls.resetFx();
+}
 
 // acesso pelo console (útil para gravar vídeos e depurar)
-window.sim = { get st() { return st; }, params, scene, sound, reset, pres };
+window.sim = { get st() { return st; }, params, scene, panel, controls, sound, reset, pres, tick, resetFx, video: VIDEO };

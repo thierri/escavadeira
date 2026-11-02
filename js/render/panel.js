@@ -129,6 +129,13 @@ export class Panel {
     });
   }
 
+  // ponteiros no zero e gráfico vazio (usado ao gravar o vídeo, cena a cena)
+  resetFx() {
+    for (const d of [this.rpm, this.p1, this.p2, this.pil, this.oilT, this.cool]) d.v = d.o.min;
+    const c = this.chart;
+    c.acc = 0; c.p1 = []; c.p2 = [];
+  }
+
   update(st, dt) {
     this.rpm.set(st.eng.rpm, dt);
     this.p1.set(st.pumps[0].p, dt);

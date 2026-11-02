@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765"],
       "port": 8765
+    },
+    {
+      "name": "video",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "video\\tools\\preview.cmd"],
+      "port": 3002
     }
   ]
 }

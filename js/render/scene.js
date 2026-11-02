@@ -514,6 +514,18 @@ export class Scene {
     this.viewTxt = txt(g, 16, SCENE_H - 16, '', { class: 'view-t' });
   }
 
+  // Zera os efeitos que dependem do histórico (fumaça, bolhas, gotas, fases das
+  // animações), para que uma cena gravada sempre comece igual.
+  resetFx() {
+    for (const p of this.smoke) p.e.remove();
+    for (const b of this.bubbles) b.e.remove();
+    for (const d of this.drips) d.e.remove();
+    this.smoke = []; this.bubbles = []; this.drips = [];
+    this.smokeAcc = 0; this.bubbleAcc = 0; this.streamOff = 0; this.sucPh = 0; this.flyAng = 0;
+    const hoses = [...Object.values(this.h), ...this.hp, ...Object.values(this.hw).flat()];
+    for (const h of hoses) h.off = 0;
+  }
+
   setLayer(name, on) {
     this.layers[name] = on;
     const map = { hoses: [this.gHosesBody, this.gHosesBoom], pilot: [this.gPilot], labels: [this.gLabels], values: [this.gValues, this.gValuesPump], pumpValues: [this.gValuesPump] };
