@@ -93,16 +93,9 @@ export class Controls {
     this.ax = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, travelL: 0, travelR: 0 };
     this.boostHeld = false; this.startHeld = false;
 
-    // --- ignição ---
-    const sk = section(root, 'Ignição', 150);
-    const kw = document.createElement('div'); kw.className = 'keysw'; sk.appendChild(kw);
-    this.bOff = btn(kw, 'Desligado'); this.bOn = btn(kw, 'Ligado'); this.bStart = btn(kw, 'Partida <small>(segure)</small>');
-    this.bOff.onclick = () => { this.st.key = 0; };
-    this.bOn.onclick = () => { this.st.key = 1; };
-    const sDown = (e) => { e.preventDefault(); this.startHeld = true; };
-    const sUp = () => { this.startHeld = false; };
-    this.bStart.addEventListener('pointerdown', sDown);
-    this.bStart.addEventListener('pointerup', sUp); this.bStart.addEventListener('pointerleave', sUp);
+    // --- ignição: chave giratória (Desligado ← Ligado → Partida, com mola de volta) ---
+    const sk = section(root, 'Ignição', 222);
+    this.buildKey(sk);
 
     // --- acelerador ---
     const sa = section(root, 'Acelerador', 170);
@@ -124,44 +117,18 @@ export class Controls {
     kn.addEventListener('wheel', (e) => { e.preventDefault(); this.st.throttle = clamp(this.st.throttle + (e.deltaY < 0 ? 1 : -1), 1, 10); }, { passive: false });
     this.rpmTarget = document.createElement('div'); this.rpmTarget.className = 'sub'; sa.appendChild(this.rpmTarget);
 
-    // --- modo / reforço / marcha lenta ---
-    const sm = section(root, 'Modo de trabalho', 170);
-    const mw = document.createElement('div'); mw.className = 'seg'; sm.appendChild(mw);
-    this.modeBtns = {};
-    for (const [k, n] of [['E', 'Eco'], ['S', 'Padrão'], ['P', 'Potência']]) {
-      const b = btn(mw, n); b.onclick = () => { this.st.mode = k; }; this.modeBtns[k] = b;
-    }
-    this.bBoost = btn(sm, 'Reforço de força <small>(segure)</small>', 'wide');
-    this.bBoost.addEventListener('pointerdown', (e) => { e.preventDefault(); this.boostHeld = true; });
-    const bu = () => { this.boostHeld = false; };
-    this.bBoost.addEventListener('pointerup', bu); this.bBoost.addEventListener('pointerleave', bu);
-    this.bIdle = btn(sm, 'Marcha lenta automática', 'wide');
-    this.bIdle.onclick = () => { this.st.autoIdle = !this.st.autoIdle; };
-
-    // --- alavanca de segurança ---
-    const sl = section(root, 'Alavanca de segurança', 140);
-    const lv = el('svg', { width: 120, height: 130, viewBox: '0 0 120 130', class: 'lock' }, sl);
-    el('rect', { x: 20, y: 96, width: 80, height: 18, rx: 6, fill: '#d1d5db' }, lv);
-    this.lockArm = el('g', {}, lv);
-    el('rect', { x: -5, y: -70, width: 10, height: 70, rx: 4, fill: '#4b5563' }, this.lockArm);
-    el('rect', { x: -14, y: -84, width: 28, height: 20, rx: 6, fill: '#f2b705', stroke: '#1f2633' }, this.lockArm);
-    el('circle', { cx: 0, cy: 0, r: 8, fill: '#1f2633' }, this.lockArm);
-    this.lockArm.setAttribute('transform', 'translate(60 102)');
-    this.lockTxt = document.createElement('div'); this.lockTxt.className = 'lock-t'; sl.appendChild(this.lockTxt);
-    lv.addEventListener('click', () => { this.st.locked = !this.st.locked; });
-    this.lockTxt.addEventListener('click', () => { this.st.locked = !this.st.locked; });
-
     // --- joystick esquerdo ---
     const sj = section(root, 'Joystick esquerdo', 220);
-    this.padL = new Pad(sj, 176, { top: 'braço p/ fora', bottom: 'braço p/ dentro', left: '◀ giro', right: 'giro ▶' });
-    this.hint(sj, 'teclas W A S D');
+    // giro desabilitado: a vista é um corte lateral 2D
+    this.padL = new Pad(sj, 176, { top: 'braço p/ fora', bottom: 'braço p/ dentro', left: '', right: '' });
+    this.hint(sj, 'teclas W / S');
 
     // --- translação ---
     const st2 = section(root, 'Translação', 170);
     const lw = document.createElement('div'); lw.className = 'levers'; st2.appendChild(lw);
     this.levL = new Lever(lw, 128, 'esq.');
     this.levR = new Lever(lw, 128, 'dir.');
-    this.hint(st2, 'Q/Z · E/C');
+    this.hint(st2, 'as duas juntas · Q/Z ou E/C');
 
     // --- joystick direito ---
     const sr = section(root, 'Joystick direito', 220);
@@ -177,7 +144,6 @@ export class Controls {
       const k = e.key.toLowerCase();
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
       if (!e.repeat) {
-        if (k === 'l') this.st.locked = !this.st.locked;
         if (k === 'i') this.st.key = this.st.key ? 0 : 1;
         if (k === '+' || k === '=') this.st.throttle = clamp(this.st.throttle + 1, 1, 10);
         if (k === '-') this.st.throttle = clamp(this.st.throttle - 1, 1, 10);
@@ -188,6 +154,72 @@ export class Controls {
     window.addEventListener('blur', () => this.keys.clear());
   }
   hint(parent, s) { const d = document.createElement('div'); d.className = 'hint'; d.textContent = s; parent.appendChild(d); }
+
+  // Chave de ignição: arraste (ou clique na posição) para girar.
+  // Desligado (esquerda) · Ligado (em cima) · Partida (direita, volta sozinha ao soltar).
+  buildKey(parent) {
+    const W = 198, Hh = 150, C = [99, 88];
+    const POS = [-60, 0, 60];
+    const svg = el('svg', { width: W, height: Hh, viewBox: `0 0 ${W} ${Hh}`, class: 'ignkey' }, parent);
+    const pt = (deg, r) => [C[0] + r * Math.sin((deg * Math.PI) / 180), C[1] - r * Math.cos((deg * Math.PI) / 180)];
+    el('circle', { cx: C[0], cy: C[1], r: 52, fill: '#2b3140', stroke: '#000' }, svg);
+    el('circle', { cx: C[0], cy: C[1], r: 44, fill: '#3a4152' }, svg);
+    this.keyLbl = ['DESL.', 'LIGADO', 'PARTIDA'].map((s, i) => {
+      const [x1, y1] = pt(POS[i], 45), [x2, y2] = pt(POS[i], 52);
+      el('line', { x1, y1, x2, y2, stroke: '#9aa3ad', 'stroke-width': 3, 'stroke-linecap': 'round' }, svg);
+      const [tx, ty] = pt(POS[i], 64);
+      return txt(svg, tx + [-4, 0, 4][i], ty + 4, s, { 'text-anchor': ['end', 'middle', 'start'][i], class: 'key-l' });
+    });
+    // tambor e chave (giram juntos)
+    this.keyG = el('g', {}, svg);
+    el('circle', { cx: 0, cy: 0, r: 30, fill: '#c9ced6', stroke: '#1f2633', 'stroke-width': 1.5 }, this.keyG);
+    el('circle', { cx: 0, cy: 0, r: 24, fill: 'none', stroke: '#9aa3ad', 'stroke-width': 1 }, this.keyG);
+    el('rect', { x: -4, y: -20, width: 8, height: 40, rx: 2, fill: '#59616d' }, this.keyG);
+    el('path', { d: 'M-15 -40 Q-15 -48 -7 -48 L7 -48 Q15 -48 15 -40 L15 -8 Q15 0 7 0 L-7 0 Q-15 0 -15 -8 Z', fill: '#f2b705', stroke: '#1f2633', 'stroke-width': 1.5 }, this.keyG);
+    el('circle', { cx: 0, cy: -38, r: 4, fill: '#3a4152' }, this.keyG);
+    el('rect', { x: -2, y: -30, width: 4, height: 22, rx: 2, fill: '#1f2633', opacity: 0.35 }, this.keyG);
+    this.keyAng = POS[0]; this.keyPOS = POS; this.keyC = C;
+    this.keyTxt = document.createElement('div'); this.keyTxt.className = 'sub'; parent.appendChild(this.keyTxt);
+
+    let drag = null;
+    const posFrom = (ev) => {
+      const r = svg.getBoundingClientRect(), k = W / r.width;
+      const dx = (ev.clientX - r.left) * k - C[0], dy = (ev.clientY - r.top) * k - C[1];
+      const ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
+      return { d: Math.hypot(dx, dy), pos: ang < -27 ? 0 : ang > 27 ? 2 : 1 };
+    };
+    const apply = (pos) => {
+      this.startHeld = pos === 2;
+      this.st.key = pos === 0 ? 0 : Math.max(1, this.st.key === 2 && pos === 2 ? 2 : 1);
+    };
+    svg.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      svg.setPointerCapture(ev.pointerId);
+      const p = posFrom(ev);
+      drag = { x: ev.clientX, y: ev.clientY, moved: false, center: p.d < 32 };
+      if (!drag.center) apply(p.pos);
+    });
+    svg.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      if (Math.hypot(ev.clientX - drag.x, ev.clientY - drag.y) > 6) drag.moved = true;
+      if (drag.moved) apply(posFrom(ev).pos);
+    });
+    const up = () => {
+      if (!drag) return;
+      // clique no meio da chave (sem arrastar) liga/desliga
+      if (drag.center && !drag.moved) this.st.key = this.st.key ? 0 : 1;
+      this.startHeld = false;   // a mola traz a chave de volta de "Partida" para "Ligado"
+      drag = null;
+    };
+    svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  }
+  drawKey(st, dt) {
+    const target = this.keyPOS[st.key] ?? 0;
+    this.keyAng += (target - this.keyAng) * Math.min(1, dt * 16);
+    this.keyG.setAttribute('transform', `translate(${this.keyC[0]} ${this.keyC[1]}) rotate(${this.keyAng.toFixed(1)})`);
+    this.keyLbl.forEach((t, i) => t.classList.toggle('on', i === st.key));
+    this.keyTxt.textContent = st.key === 2 ? 'dando partida…' : st.key === 0 ? 'desligado' : st.eng.running ? 'motor ligado' : 'ligado · gire até Partida';
+  }
 
   update(dt) {
     const st = this.st, k = this.keys;
@@ -206,8 +238,6 @@ export class Controls {
       const b = (i) => (gp.buttons[i] ? gp.buttons[i].value : 0);
       target.travelL += b(4) - b(6); target.travelR += b(5) - b(7);
       gpBoost = b(0) > 0.5; gpStart = b(9) > 0.5;
-      if (b(3) > 0.5 && !this.gpY) st.locked = !st.locked;
-      this.gpY = b(3) > 0.5;
     }
     // rampa suave para teclado/controle
     const ramp = 3.2 * dt;
@@ -239,6 +269,13 @@ export class Controls {
       ({ leftX: lx2, leftY: ly2, rightX: rx2, rightY: ry2, travelL: tl, travelR: tr } = o);
       startNow = !!o.start; boostNow = !!o.boost;
     }
+    // Simulador 2D: sem giro, e as esteiras andam sempre juntas (só frente/trás).
+    // Vale o comando mais forte entre as duas alavancas; as duas se movem juntas.
+    lx2 = 0;
+    const travel = Math.abs(tl) >= Math.abs(tr) ? tl : tr;
+    tl = tr = travel;
+    if (this.levL.drag) this.levR.v = this.levL.v;
+    else if (this.levR.drag) this.levL.v = this.levR.v;
     Object.assign(st.input, { leftX: lx2, leftY: ly2, rightX: rx2, rightY: ry2, travelL: tl, travelR: tr });
     this.padL.draw(lx2, ly2); this.padR.draw(rx2, ry2);
     this.levL.draw(tl); this.levR.draw(tr);
@@ -248,18 +285,10 @@ export class Controls {
     st.boost = boostNow;
 
     // reflexo visual
-    this.bOff.classList.toggle('on', st.key === 0);
-    this.bOn.classList.toggle('on', st.key === 1);
-    this.bStart.classList.toggle('on', st.key === 2);
+    this.drawKey(st, dt);
     const a = ((135 + ((st.throttle - 1) / 9) * 270) * Math.PI) / 180;
     this.knobMark.setAttribute('x2', 75 + Math.cos(a) * 46); this.knobMark.setAttribute('y2', 75 + Math.sin(a) * 46);
     this.knobTxt.textContent = st.throttle;
     this.rpmTarget.textContent = st.eng.running ? `alvo ${Math.round(st.eng.target)} rpm${st.eng.autoIdling ? ' (lenta auto)' : ''}` : 'motor desligado';
-    for (const m in this.modeBtns) this.modeBtns[m].classList.toggle('on', st.mode === m);
-    this.bBoost.classList.toggle('on', st.boost);
-    this.bIdle.classList.toggle('on', st.autoIdle);
-    this.lockArm.setAttribute('transform', `translate(60 102) rotate(${st.locked ? -10 : -80})`);
-    this.lockTxt.textContent = st.locked ? 'TRAVADO · comandos sem efeito' : 'LIBERADO';
-    this.lockTxt.classList.toggle('locked', st.locked);
   }
 }

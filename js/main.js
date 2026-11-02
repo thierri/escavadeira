@@ -55,36 +55,36 @@ document.querySelectorAll('[data-layer]').forEach((b) => {
   };
 });
 // velocidade / pausa
-let speed = 1, paused = false;
-document.querySelectorAll('[data-speed]').forEach((b) => {
-  b.onclick = () => {
-    speed = +b.dataset.speed;
-    document.querySelectorAll('[data-speed]').forEach((x) => x.classList.toggle('on', x === b));
-  };
-});
-const pauseBtn = document.getElementById('pause');
-pauseBtn.onclick = () => { paused = !paused; pauseBtn.classList.toggle('on', paused); pauseBtn.textContent = paused ? 'Continuar' : 'Pausar'; };
+// velocidade fixa em 1×; a pausa só existe no modo apresentação (tecla P)
+const speed = 1;
+let paused = false;
 
-// som: o navegador só libera áudio após um gesto do usuário (clique ou tecla)
+// som: começa ligado. O navegador só libera áudio após o primeiro gesto
+// (clique ou tecla em qualquer lugar), então ele "acorda" nesse momento.
 const sound = new Sound();
 const sBtn = document.getElementById('btn-sound');
 const vol = document.getElementById('vol');
-sBtn.textContent = 'Clique para ativar';
-sBtn.classList.add('wait');
-const unlock = async () => {
-  if (sound.ctx) return;
-  await sound.init();
-  sBtn.classList.remove('wait');
-  sBtn.textContent = sound.enabled ? 'Ligado' : 'Mudo';
+let unlockedNow = false;
+const unlock = (e) => {
+  if (sound.ctx || sound.initializing) return;
+  unlockedNow = e.type === 'pointerdown';
+  sound.init();
 };
 addEventListener('pointerdown', unlock, { capture: true });
 addEventListener('keydown', unlock, { capture: true });
-sBtn.onclick = () => {
-  if (!sound.ctx) return;
-  sound.setEnabled(!sound.enabled);
-  sBtn.classList.toggle('on', sound.enabled);
-  sBtn.textContent = sound.enabled ? 'Ligado' : 'Mudo';
+const showSound = () => {
+  const label = sound.enabled ? 'Som ligado (clique para silenciar)' : 'Som mudo (clique para ligar)';
+  sBtn.classList.toggle('muted', !sound.enabled);
+  sBtn.title = label; sBtn.setAttribute('aria-label', label);
 };
+sBtn.onclick = () => {
+  // o primeiro clique da página só libera o áudio; não deve silenciar
+  if (unlockedNow) { unlockedNow = false; return; }
+  sound.setEnabled(!sound.enabled);
+  showSound();
+};
+addEventListener('pointerup', () => { setTimeout(() => { unlockedNow = false; }, 0); }, { capture: true });
+showSound();
 vol.oninput = () => sound.setVolume(+vol.value);
 vol.addEventListener('keydown', (e) => e.stopPropagation());
 
@@ -100,7 +100,7 @@ const pres = new Presentation({
   stage, scene, controls, sound, params, setLayers,
   st: () => st,
   reset,
-  togglePause: () => pauseBtn.click(),
+  togglePause: () => { paused = !paused; },
 });
 document.getElementById('btn-present').onclick = () => {
   if (drawer.open) { drawer.toggle(false); document.getElementById('btn-params').classList.remove('on'); }

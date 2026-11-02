@@ -10,8 +10,20 @@ const OX = 420, OY = 480;
 
 // ordem das seções no bloco de válvulas (de cima para baixo)
 export const VALVE_ORDER = ['bucket', 'arm', 'boom', 'swing', 'travelL', 'travelR'];
-const VALVE = { x0: 0.2, x1: 0.8, y0: 1.2, y1: 2.0 };
+const VALVE = { x0: 0.18, x1: 0.82, y0: 1.18, y1: 2.06 };
 const secY = (i) => VALVE.y1 - (i + 0.5) * ((VALVE.y1 - VALVE.y0) / 6);
+
+// Carcaça ampliada: tudo que fica dentro dela (motor, bombas, tanque, válvulas)
+// é desenhado em "coordenadas da carcaça" e ampliado por BODY.k a partir do
+// ponto (ax, ay). Lança, braço, caçamba e esteiras ficam no tamanho real.
+const BODY = { ax: -0.3, ay: 1.08, k: 1.25 };
+const H = ([x, y]) => [BODY.ax + (x - BODY.ax) * BODY.k, BODY.ay + (y - BODY.ay) * BODY.k];
+const HOUSE = { x0: H([-2.15, 0])[0], x1: H([1.45, 0])[0], top: H([0, 2.6])[1] };
+const CAB_DY = HOUSE.top - 2.6;           // a cabine sobe junto com o teto
+const PUMP_CX = [-0.965, -0.715];         // centro de P1 e P2 (coord. da carcaça)
+const SHAFT_Y = 1.5;                      // eixo motor → bombas
+const TANK = { x0: -0.46, x1: -0.08, y0: 1.32, strainer: [-0.39, 1.37], filterX: -0.255, filterY: 1.92 };
+const STACK_TOP = [-1.4, 2.88];           // saída do escapamento (coord. da carcaça)
 
 const NSS = { 'vector-effect': 'non-scaling-stroke' };
 const INK = '#1f2633';
@@ -19,20 +31,29 @@ const STEEL = '#c9ced6';
 const MACHINE = '#f3cf6c';
 const MACHINE_D = '#d9a93a';
 
+// mistura duas cores hex (t = 0 → a, t = 1 → b)
+function mix(a, b, t) {
+  t = Math.max(0, Math.min(1, t));
+  const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const A = h(a), B = h(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
+}
+
 // ---------- mangueira ----------
 class Hose {
   constructor(parent, w, kind, comp) {
     this.w = w; this.kind = kind; this.off = 0;
     this.g = el('g', { class: 'comp hose', 'data-comp': comp }, parent);
-    this.o = el('path', { fill: 'none', stroke: INK, 'stroke-width': w + 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, this.g);
+    // contorno fino e suave, núcleo colorido pela pressão e tracinhos de fluxo
+    this.o = el('path', { fill: 'none', stroke: INK, 'stroke-opacity': 0.55, 'stroke-width': w + 1.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, this.g);
     this.c = el('path', { fill: 'none', 'stroke-width': w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, this.g);
     this.f = el('path', {
-      fill: 'none', stroke: '#ffffff', 'stroke-opacity': 0.85, 'stroke-width': Math.max(1.5, w * 0.42),
-      'stroke-linecap': 'round', 'stroke-dasharray': `${Math.max(2, w * 0.35)} ${w * 2.4 + 4}`,
+      fill: 'none', stroke: '#ffffff', 'stroke-opacity': 0.9, 'stroke-width': Math.max(0.9, w * 0.38),
+      'stroke-linecap': 'round', 'stroke-dasharray': `${Math.max(1.5, w * 0.5)} ${w * 2.2 + 5}`,
     }, this.g);
   }
   update(pts, p, q, dt) {
-    const d = roundedD(pts, 9);
+    const d = roundedD(pts, 7);
     this.o.setAttribute('d', d); this.c.setAttribute('d', d); this.f.setAttribute('d', d);
     this.c.setAttribute('stroke', this.kind === 'pilot' ? pilotColor(p) : pColor(p));
     const speed = Math.max(-240, Math.min(240, q * (this.kind === 'pilot' ? 3 : 1.1)));
@@ -112,6 +133,14 @@ export class Scene {
     el('circle', { cx: 11, cy: 22, r: 0.9, fill: '#b28a62' }, soil);
     const glow = el('filter', { id: 'glow', x: '-30%', y: '-30%', width: '160%', height: '160%' }, defs);
     el('feDropShadow', { dx: 0, dy: 0, stdDeviation: 4, 'flood-color': '#2563eb', 'flood-opacity': 0.9 }, glow);
+    // o pé da lança fica translúcido sobre a carcaça, para não esconder o que está dentro
+    const bm = el('mask', { id: 'boomGhost', maskUnits: 'userSpaceOnUse', x: -3000, y: -3000, width: 8000, height: 8000 }, defs);
+    el('rect', { x: -3000, y: -3000, width: 8000, height: 8000, fill: '#fff' }, bm);
+    this.boomHole = el('rect', { fill: '#6a6a6a' }, bm);
+    // óleo do tanque: degradê vertical
+    const og = el('linearGradient', { id: 'oilGrad', x1: 0, y1: 1, x2: 0, y2: 0 }, defs);
+    el('stop', { offset: 0, 'stop-color': '#5b95cc' }, og);
+    el('stop', { offset: 1, 'stop-color': '#9cc6ea' }, og);
 
     el('rect', { x: -800, y: -600, width: SCENE_W + 1600, height: SCENE_H + 1200, fill: 'url(#sky)' }, s);
     // grade técnica discreta
@@ -131,12 +160,15 @@ export class Scene {
     // estrutura superior (em metros, y para cima)
     this.gUpper = el('g', {}, s);
     this.buildUpper();
+    this.gSmoke = el('g', { 'pointer-events': 'none' }, s);
+    this.smoke = []; this.smokeAcc = 0;
 
     // mangueiras do corpo
     this.gHosesBody = el('g', {}, s);
     this.gPilot = el('g', {}, s);
     this.gCylBoom = el('g', {}, s);
-    this.gBoom = el('g', { class: 'comp', 'data-comp': 'boom' }, s);
+    const boomWrap = el('g', { mask: 'url(#boomGhost)' }, s);
+    this.gBoom = el('g', { class: 'comp', 'data-comp': 'boom' }, boomWrap);
     this.buildBoom();
     this.gHosesBoom = el('g', {}, s);
     this.gCylArm = el('g', {}, s);
@@ -189,83 +221,122 @@ export class Scene {
   // ----- estrutura superior -----
   buildUpper() {
     const g = this.gUpper;
-    const m = (tag, a, comp) => {
-      const e = el(tag, { ...NSS, ...a }, comp ? this.compGroup(g, comp) : g);
-      return e;
-    };
     this.compGroups = {};
-    // cabine (lado oposto, ao fundo)
+    // cabine (sobe junto com o teto da carcaça ampliada)
     const cab = this.compGroup(g, 'cab');
+    cab.setAttribute('transform', `translate(0 ${CAB_DY})`);
     el('path', { ...NSS, d: 'M0.1 2.6 L0.2 3.32 L1.12 3.32 L1.42 2.6 Z', fill: '#e8eef3', stroke: INK, 'stroke-width': 1.5 }, cab);
     el('path', { ...NSS, d: 'M0.26 2.7 L0.32 3.22 L1.05 3.22 L1.28 2.7 Z', fill: '#cfe2ee', stroke: '#7d8a99', 'stroke-width': 1 }, cab);
     el('rect', { ...NSS, x: 0.62, y: 2.6, width: 0.28, height: 0.22, fill: '#59616d' }, cab); // banco
     this.joyMark = el('line', { ...NSS, x1: 0.42, y1: 2.6, x2: 0.42, y2: 2.88, stroke: INK, 'stroke-width': 3, 'stroke-linecap': 'round' }, cab);
     el('circle', { ...NSS, cx: 0.42, cy: 2.88, r: 0.04, fill: '#d62828' }, cab);
-    // contrapeso
-    el('path', { ...NSS, d: 'M-2.15 1.08 L-2.72 1.08 Q-2.88 1.08 -2.88 1.3 L-2.88 2.3 Q-2.88 2.52 -2.66 2.52 L-2.15 2.52 Z', fill: MACHINE_D, stroke: INK, 'stroke-width': 2 }, this.compGroup(g, 'counterweight'));
+    // contrapeso (encostado na traseira da carcaça ampliada)
+    const x0 = HOUSE.x0, top = HOUSE.top - 0.1;
+    el('path', { ...NSS, d: `M${x0} 1.08 L${x0 - 0.46} 1.08 Q${x0 - 0.62} 1.08 ${x0 - 0.62} 1.3 L${x0 - 0.62} ${top - 0.22} Q${x0 - 0.62} ${top} ${x0 - 0.4} ${top} L${x0} ${top} Z`, fill: MACHINE_D, stroke: INK, 'stroke-width': 2 }, this.compGroup(g, 'counterweight'));
+
+    // ---- tudo daqui para baixo é ampliado (coordenadas da carcaça) ----
+    const b = el('g', { transform: `translate(${BODY.ax} ${BODY.ay}) scale(${BODY.k}) translate(${-BODY.ax} ${-BODY.ay})` }, g);
+    this.gBody = b;
     // carcaça em corte
-    const hs = this.compGroup(g, 'housing');
+    const hs = this.compGroup(b, 'housing');
     el('rect', { ...NSS, x: -2.15, y: 1.08, width: 3.6, height: 1.52, fill: '#fbfaf6', stroke: INK, 'stroke-width': 2 }, hs);
     el('rect', { ...NSS, x: -2.15, y: 2.56, width: 3.6, height: 0.06, fill: MACHINE, stroke: INK, 'stroke-width': 1.5 }, hs);
     // radiadores
-    const rad = this.compGroup(g, 'radiator');
-    el('rect', { ...NSS, x: -2.1, y: 1.85, width: 0.13, height: 0.52, fill: '#b9c3cf', stroke: INK, 'stroke-width': 1.2 }, rad);
-    this.cooler = el('rect', { ...NSS, x: -2.1, y: 1.2, width: 0.13, height: 0.6, stroke: INK, 'stroke-width': 1.2 }, rad);
-    for (let y = 1.25; y < 2.35; y += 0.07) el('line', { ...NSS, x1: -2.1, y1: y, x2: -1.97, y2: y, stroke: '#7f8b99', 'stroke-width': 0.8 }, rad);
-    // motor diesel
-    const en = this.compGroup(g, 'engine');
-    el('rect', { ...NSS, x: -1.9, y: 1.3, width: 0.7, height: 0.72, rx: 0.05, fill: '#6b7686', stroke: INK, 'stroke-width': 2 }, en);
-    el('rect', { ...NSS, x: -1.86, y: 2.02, width: 0.62, height: 0.16, fill: '#59636f', stroke: INK, 'stroke-width': 1.5 }, en);
-    for (let i = 0; i < 4; i++) el('rect', { ...NSS, x: -1.82 + i * 0.15, y: 1.6, width: 0.1, height: 0.36, fill: '#7f8b99', stroke: '#444c58', 'stroke-width': 1 }, en);
-    el('rect', { ...NSS, x: -1.42, y: 2.18, width: 0.07, height: 0.58, fill: '#4a5262', stroke: INK, 'stroke-width': 1.2 }, en); // escape
-    el('rect', { ...NSS, x: -1.97, y: 1.4, width: 0.05, height: 0.62, rx: 0.02, fill: '#9aa3ad', stroke: INK, 'stroke-width': 1 }, en); // ventilador
+    const rad = this.compGroup(b, 'radiator');
+    el('rect', { ...NSS, x: -2.1, y: 1.85, width: 0.13, height: 0.52, fill: '#b9c3cf', stroke: INK, 'stroke-width': 1 }, rad);
+    this.cooler = el('rect', { ...NSS, x: -2.1, y: 1.2, width: 0.13, height: 0.6, stroke: INK, 'stroke-width': 1 }, rad);
+    for (let y = 1.25; y < 2.35; y += 0.07) el('line', { ...NSS, x1: -2.1, y1: y, x2: -1.97, y2: y, stroke: '#7f8b99', 'stroke-width': 0.7 }, rad);
+
+    // ---- motor diesel em corte: 4 cilindros, pistões, bielas e virabrequim ----
+    const en = this.compGroup(b, 'engine');
+    el('rect', { ...NSS, x: -1.97, y: 1.36, width: 0.05, height: 0.62, rx: 0.02, fill: '#9aa3ad', stroke: INK, 'stroke-width': 1 }, en); // ventilador
+    el('rect', { ...NSS, x: -1.9, y: 1.3, width: 0.7, height: 0.34, rx: 0.05, fill: '#5b6574', stroke: INK, 'stroke-width': 1.5 }, en); // cárter
+    el('rect', { ...NSS, x: -1.9, y: 1.64, width: 0.7, height: 0.35, fill: '#7b8696', stroke: INK, 'stroke-width': 1.5 }, en);          // bloco
+    el('rect', { ...NSS, x: -1.92, y: 1.99, width: 0.74, height: 0.11, rx: 0.02, fill: '#59636f', stroke: INK, 'stroke-width': 1.5 }, en); // cabeçote
+    el('rect', { ...NSS, x: -1.87, y: 2.1, width: 0.64, height: 0.05, rx: 0.02, fill: '#4a5262', stroke: INK, 'stroke-width': 1 }, en);   // tampa
+    // coletor e escapamento (silencioso + chaminé)
+    el('path', { ...NSS, d: 'M-1.80 2.04 L-1.80 2.2 L-1.47 2.2', fill: 'none', stroke: '#3d4450', 'stroke-width': 4, 'stroke-linejoin': 'round' }, en);
+    el('rect', { ...NSS, x: -1.5, y: 2.17, width: 0.22, height: 0.15, rx: 0.05, fill: '#6b7380', stroke: INK, 'stroke-width': 1.2 }, en);
+    el('rect', { ...NSS, x: -1.43, y: 2.32, width: 0.06, height: 0.56, fill: '#4a5262', stroke: INK, 'stroke-width': 1.2 }, en);
+    el('rect', { ...NSS, x: -1.45, y: 2.86, width: 0.1, height: 0.025, fill: '#3d4450', stroke: INK, 'stroke-width': 1 }, en);
+    this.stackGlow = el('rect', { ...NSS, x: -1.42, y: 2.33, width: 0.04, height: 0.53, fill: '#ff8a3d', opacity: 0 }, en);
+    this.cyls = [];
+    for (let i = 0; i < 4; i++) {
+      const xc = -1.79 + i * 0.16;
+      el('rect', { ...NSS, x: xc - 0.055, y: 1.66, width: 0.11, height: 0.32, fill: '#e3e7ec', stroke: '#3d4450', 'stroke-width': 0.8 }, en);
+      const gas = el('rect', { ...NSS, x: xc - 0.054, width: 0.108, fill: '#e3e7ec' }, en);
+      const rod = el('line', { ...NSS, stroke: '#3d4450', 'stroke-width': 2.2, 'stroke-linecap': 'round' }, en);
+      const piston = el('rect', { ...NSS, x: xc - 0.05, width: 0.1, height: 0.09, rx: 0.01, fill: '#aab3be', stroke: INK, 'stroke-width': 1 }, en);
+      const pin = el('circle', { ...NSS, r: 0.016, fill: '#d9dee5', stroke: INK, 'stroke-width': 0.8 }, en);
+      // válvulas de admissão/escape (dois tracinhos no cabeçote)
+      el('line', { ...NSS, x1: xc - 0.025, y1: 1.99, x2: xc - 0.025, y2: 2.06, stroke: '#9aa3ad', 'stroke-width': 1.2 }, en);
+      el('line', { ...NSS, x1: xc + 0.025, y1: 1.99, x2: xc + 0.025, y2: 2.06, stroke: '#9aa3ad', 'stroke-width': 1.2 }, en);
+      this.cyls.push({ xc, gas, rod, piston, pin });
+    }
+    el('line', { ...NSS, x1: -1.9, y1: SHAFT_Y, x2: -1.2, y2: SHAFT_Y, stroke: '#3d4450', 'stroke-width': 2.5 }, en); // virabrequim
     this.flywheel = el('g', {}, en);
-    el('circle', { ...NSS, cx: -1.17, cy: 1.65, r: 0.14, fill: '#8a939f', stroke: INK, 'stroke-width': 1.5 }, this.flywheel);
-    this.flyMark = el('line', { ...NSS, x1: -1.17, y1: 1.65, x2: -1.17, y2: 1.77, stroke: '#fff', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, this.flywheel);
-    // bombas
-    const pu = this.compGroup(g, 'pumps');
-    el('line', { ...NSS, x1: -1.2, y1: 1.65, x2: -0.58, y2: 1.65, stroke: INK, 'stroke-width': 3 }, pu);
-    this.pumpBody = [
-      el('rect', { ...NSS, x: -1.1, y: 1.45, width: 0.2, height: 0.4, rx: 0.03, stroke: INK, 'stroke-width': 1.8 }, pu),
-      el('rect', { ...NSS, x: -0.88, y: 1.45, width: 0.2, height: 0.4, rx: 0.03, stroke: INK, 'stroke-width': 1.8 }, pu),
-    ];
-    this.swash = [
-      el('line', { ...NSS, stroke: INK, 'stroke-width': 2.5, 'stroke-linecap': 'round' }, pu),
-      el('line', { ...NSS, stroke: INK, 'stroke-width': 2.5, 'stroke-linecap': 'round' }, pu),
-    ];
-    const pp = this.compGroup(g, 'pilotPump');
-    this.pilotPumpBody = el('rect', { ...NSS, x: -0.66, y: 1.55, width: 0.08, height: 0.2, rx: 0.02, stroke: INK, 'stroke-width': 1.5 }, pp);
-    // tanque
-    const tk = this.compGroup(g, 'tank');
-    el('rect', { ...NSS, x: -0.48, y: 1.3, width: 0.42, height: 0.82, rx: 0.03, fill: '#f2f5f8', stroke: INK, 'stroke-width': 2 }, tk);
-    this.tankOil = el('rect', { ...NSS, x: -0.46, y: 1.32, width: 0.38, height: 0.5, fill: '#7fb0de' }, tk);
-    this.tankWave = el('line', { ...NSS, stroke: '#3b82c4', 'stroke-width': 2 }, tk);
-    el('rect', { ...NSS, x: -0.3, y: 1.8, width: 0.09, height: 0.28, fill: '#fff', stroke: '#566170', 'stroke-width': 1, 'stroke-dasharray': '3 2' }, tk); // filtro de retorno
-    el('rect', { ...NSS, x: -0.44, y: 1.32, width: 0.1, height: 0.1, fill: 'none', stroke: '#566170', 'stroke-width': 1, 'stroke-dasharray': '2 2' }, tk); // tela de sucção
+    el('circle', { ...NSS, cx: -1.22, cy: SHAFT_Y, r: 0.12, fill: '#8a939f', stroke: INK, 'stroke-width': 1.2 }, this.flywheel);
+    this.flyMark = el('line', { ...NSS, x1: -1.22, y1: SHAFT_Y, x2: -1.22, y2: SHAFT_Y + 0.1, stroke: '#fff', 'stroke-width': 2, 'stroke-linecap': 'round' }, this.flywheel);
+
+    // ---- bombas principais (pistões axiais, em corte) ----
+    const pu = this.compGroup(b, 'pumps');
+    el('line', { ...NSS, x1: -1.22, y1: SHAFT_Y, x2: -0.53, y2: SHAFT_Y, stroke: '#3d4450', 'stroke-width': 2.5 }, pu); // eixo
+    this.pumpG = PUMP_CX.map((cx) => {
+      el('rect', { ...NSS, x: cx - 0.115, y: 1.24, width: 0.23, height: 0.52, rx: 0.035, fill: '#8c95a1', stroke: INK, 'stroke-width': 1.2 }, pu);
+      const inner = el('rect', { ...NSS, x: cx - 0.1, y: 1.28, width: 0.2, height: 0.44, rx: 0.02, stroke: '#4b5563', 'stroke-width': 0.6 }, pu);
+      // tambor (gira com o eixo) e três pistões
+      el('rect', { ...NSS, x: cx - 0.035, y: 1.32, width: 0.1, height: 0.36, rx: 0.015, fill: '#c3c9d1', stroke: '#4b5563', 'stroke-width': 0.8 }, pu);
+      const pistons = [-0.11, 0, 0.11].map((dy) => el('rect', { ...NSS, y: SHAFT_Y + dy - 0.017, height: 0.034, rx: 0.008, fill: '#eef1f4', stroke: INK, 'stroke-width': 0.7 }, pu));
+      const swash = el('line', { ...NSS, stroke: INK, 'stroke-width': 3, 'stroke-linecap': 'round' }, pu);
+      const port = el('rect', { ...NSS, x: cx + 0.07, y: 1.3, width: 0.03, height: 0.4, rx: 0.01, stroke: INK, 'stroke-width': 0.8 }, pu);
+      const outlet = el('rect', { ...NSS, x: cx - 0.03, y: 1.76, width: 0.06, height: 0.035, stroke: INK, 'stroke-width': 0.8 }, pu);
+      return { cx, inner, pistons, swash, port, outlet };
+    });
+    const pp = this.compGroup(b, 'pilotPump');
+    this.pilotPumpBody = el('rect', { ...NSS, x: -0.585, y: 1.42, width: 0.06, height: 0.16, rx: 0.015, stroke: INK, 'stroke-width': 1.2 }, pp);
+
+    // ---- tanque de óleo (nível, onda, jato de retorno, bolhas e sucção) ----
+    const tk = this.compGroup(b, 'tank');
+    el('rect', { ...NSS, x: -0.48, y: 1.3, width: 0.42, height: 0.82, rx: 0.03, fill: '#f2f5f8', stroke: INK, 'stroke-width': 1.6 }, tk);
+    this.tankOil = el('path', { ...NSS, fill: 'url(#oilGrad)' }, tk);
+    this.tankWave = el('path', { ...NSS, fill: 'none', stroke: '#2f6fae', 'stroke-width': 1.4 }, tk);
+    this.tankStream = el('line', { x1: TANK.filterX, x2: TANK.filterX, y1: TANK.filterY, stroke: '#3b82c4', 'stroke-linecap': 'round', 'stroke-dasharray': '0.035 0.014' }, tk);
+    this.gBubbles = el('g', {}, tk);
+    this.bubbles = []; this.bubbleAcc = 0; this.streamOff = 0;
+    this.suctionDots = [];
+    for (let j = 0; j < 7; j++) this.suctionDots.push(el('circle', { r: 0.008, fill: '#1e5f99' }, tk));
+    for (const y of [1.55, 1.95]) el('line', { ...NSS, x1: -0.1, y1: y, x2: -0.07, y2: y, stroke: '#566170', 'stroke-width': 1 }, tk); // marcas mín./máx.
+    el('rect', { ...NSS, x: TANK.filterX - 0.045, y: TANK.filterY, width: 0.09, height: 0.18, fill: '#ffffffcc', stroke: '#566170', 'stroke-width': 0.8, 'stroke-dasharray': '3 2' }, tk); // filtro de retorno
+    el('rect', { ...NSS, x: -0.44, y: 1.32, width: 0.1, height: 0.1, fill: 'none', stroke: '#566170', 'stroke-width': 0.8, 'stroke-dasharray': '2 2' }, tk); // tela de sucção
     el('rect', { ...NSS, x: -0.42, y: 2.12, width: 0.08, height: 0.07, fill: '#566170', stroke: INK, 'stroke-width': 1 }, tk); // respiro
-    // motor de giro
-    const sw = this.compGroup(g, 'swingMotor');
-    this.swingBody = el('rect', { ...NSS, x: -0.02, y: 1.16, width: 0.15, height: 0.46, rx: 0.03, stroke: INK, 'stroke-width': 1.8 }, sw);
+
+    // motor de giro (desabilitado neste simulador, mas a peça existe)
+    const sw = this.compGroup(b, 'swingMotor');
+    this.swingBody = el('rect', { ...NSS, x: -0.02, y: 1.16, width: 0.15, height: 0.46, rx: 0.03, stroke: INK, 'stroke-width': 1.4 }, sw);
     el('rect', { ...NSS, x: 0.015, y: 1.06, width: 0.08, height: 0.1, fill: '#7d8692', stroke: INK, 'stroke-width': 1 }, sw);
     // válvula de bloqueio do piloto
-    const lk = this.compGroup(g, 'lockValve');
-    this.lockBody = el('rect', { ...NSS, x: -0.02, y: 2.37, width: 0.13, height: 0.1, rx: 0.02, stroke: INK, 'stroke-width': 1.5 }, lk);
-    // bloco de válvulas
-    const vb = this.compGroup(g, 'valve');
-    el('rect', { ...NSS, x: VALVE.x0, y: VALVE.y0, width: VALVE.x1 - VALVE.x0, height: VALVE.y1 - VALVE.y0, rx: 0.03, fill: '#aeb7c2', stroke: INK, 'stroke-width': 2 }, vb);
+    const lk = this.compGroup(b, 'lockValve');
+    this.lockBody = el('rect', { ...NSS, x: -0.02, y: 2.37, width: 0.13, height: 0.1, rx: 0.02, stroke: INK, 'stroke-width': 1.2 }, lk);
+
+    // ---- bloco de válvulas: uma seção por função, traço fino ----
+    const vb = this.compGroup(b, 'valve');
+    el('rect', { ...NSS, x: VALVE.x0, y: VALVE.y0, width: VALVE.x1 - VALVE.x0, height: VALVE.y1 - VALVE.y0, rx: 0.03, fill: '#c3cad3', stroke: INK, 'stroke-width': 1.3 }, vb);
     this.spools = [];
     const hS = (VALVE.y1 - VALVE.y0) / 6;
     for (let i = 0; i < 6; i++) {
       const y = secY(i);
-      el('line', { ...NSS, x1: VALVE.x0, y1: y - hS / 2, x2: VALVE.x1, y2: y - hS / 2, stroke: '#7d8692', 'stroke-width': 1 }, vb);
-      el('rect', { ...NSS, x: 0.26, y: y - 0.025, width: 0.48, height: 0.05, fill: '#6b7380' }, vb);
-      const sp = el('rect', { ...NSS, x: 0.38, y: y - 0.02, width: 0.24, height: 0.04, rx: 0.01, fill: '#eef1f4', stroke: INK, 'stroke-width': 1 }, vb);
-      const pil = el('rect', { ...NSS, x: 0.21, y: y - 0.03, width: 0.04, height: 0.06, fill: PILOTC }, vb);
-      this.spools.push({ sp, pil });
+      if (i) el('line', { ...NSS, x1: VALVE.x0, y1: y + hS / 2, x2: VALVE.x1, y2: y + hS / 2, stroke: '#8a939e', 'stroke-width': 0.7 }, vb);
+      el('rect', { ...NSS, x: VALVE.x0 + 0.07, y: y - 0.017, width: VALVE.x1 - VALVE.x0 - 0.14, height: 0.034, rx: 0.01, fill: '#6b7380' }, vb);
+      const sp = el('rect', { ...NSS, x: 0.37, y: y - 0.013, width: 0.26, height: 0.026, rx: 0.008, stroke: INK, 'stroke-width': 0.7 }, vb);
+      const pilL = el('rect', { ...NSS, x: VALVE.x0 + 0.012, y: y - 0.025, width: 0.045, height: 0.05, rx: 0.008, stroke: '#7c5cd6', 'stroke-width': 0.6 }, vb);
+      const pilR = el('rect', { ...NSS, x: VALVE.x1 - 0.057, y: y - 0.025, width: 0.045, height: 0.05, rx: 0.008, stroke: '#7c5cd6', 'stroke-width': 0.6 }, vb);
+      const pA = el('rect', { ...NSS, x: VALVE.x1 - 0.002, y: y + 0.02, width: 0.025, height: 0.022, stroke: INK, 'stroke-width': 0.5 }, vb);
+      const pB = el('rect', { ...NSS, x: VALVE.x1 - 0.002, y: y - 0.042, width: 0.025, height: 0.022, stroke: INK, 'stroke-width': 0.5 }, vb);
+      this.spools.push({ sp, pilL, pilR, pA, pB });
     }
     this.reliefLamp = [
-      el('circle', { ...NSS, cx: 0.27, cy: 1.16, r: 0.035, stroke: INK, 'stroke-width': 1 }, vb),
-      el('circle', { ...NSS, cx: 0.37, cy: 1.16, r: 0.035, stroke: INK, 'stroke-width': 1 }, vb),
+      el('circle', { ...NSS, cx: 0.27, cy: VALVE.y0 - 0.045, r: 0.03, stroke: INK, 'stroke-width': 0.8 }, vb),
+      el('circle', { ...NSS, cx: 0.36, cy: VALVE.y0 - 0.045, r: 0.03, stroke: INK, 'stroke-width': 0.8 }, vb),
     ];
   }
   compGroup(parent, comp) {
@@ -299,20 +370,21 @@ export class Scene {
   buildHoses() {
     const b = this.gHosesBody, bb = this.gHosesBoom, pl = this.gPilot;
     this.h = {
-      suction: new Hose(b, 9, 'suction', 'hoseSuction'),
-      ret: new Hose(b, 8, 'return', 'hoseReturn'),
-      p1: new Hose(b, 7, 'pressure', 'hosePump'),
-      p2: new Hose(b, 7, 'pressure', 'hosePump'),
-      pilotSup: new Hose(pl, 3.5, 'pilot', 'hosePilot'),
-      pilotOut: new Hose(pl, 3.5, 'pilot', 'hosePilot'),
+      suction: new Hose(b, 5.5, 'suction', 'hoseSuction'),
+      ret: new Hose(b, 4.5, 'return', 'hoseReturn'),
+      ret2: new Hose(b, 4.5, 'return', 'hoseReturn'),
+      p1: new Hose(b, 4.2, 'pressure', 'hosePump'),
+      p2: new Hose(b, 4.2, 'pressure', 'hosePump'),
+      pilotSup: new Hose(pl, 2.2, 'pilot', 'hosePilot'),
+      pilotOut: new Hose(pl, 2.2, 'pilot', 'hosePilot'),
     };
-    this.hp = VALVE_ORDER.map(() => new Hose(pl, 2.5, 'pilot', 'hosePilot'));
+    this.hp = VALVE_ORDER.map(() => new Hose(pl, 1.6, 'pilot', 'hosePilot'));
     // cada função tem seu próprio id (hoseWork-boom…), útil para destacar só aquelas mangueiras
-    const mk = (parent, id, w = 5) => [new Hose(parent, w, 'work', 'hoseWork-' + id), new Hose(parent, w, 'work', 'hoseWork-' + id)];
+    const mk = (parent, id, w = 3.4) => [new Hose(parent, w, 'work', 'hoseWork-' + id), new Hose(parent, w, 'work', 'hoseWork-' + id)];
     this.hw = {
-      boom: mk(b, 'boom'), swing: mk(b, 'swing', 4.5),
-      travelL: mk(b, 'travelL', 4), travelR: mk(b, 'travelR', 4),
-      arm: mk(bb, 'arm'), bucket: mk(bb, 'bucket', 4.5),
+      boom: mk(b, 'boom'), swing: mk(b, 'swing', 2.8),
+      travelL: mk(b, 'travelL', 2.8), travelR: mk(b, 'travelR', 2.8),
+      arm: mk(bb, 'arm'), bucket: mk(bb, 'bucket', 3),
     };
   }
 
@@ -327,18 +399,24 @@ export class Scene {
       this.labels.push({ g, line, dot, t, anchorFn, posFn, align });
     };
     const U = (x, y) => () => this.P([x, y]);
+    const UB = (x, y) => () => this.P(H([x, y]));   // ponto dentro da carcaça ampliada
     // nomes dos componentes internos ficam na "prateleira" sob a máquina
     const left = (row) => () => [this.X(-3.05), OY + 40 + row * 24];
     const right = (row) => () => [this.X(1.25), OY + 40 + row * 24];
-    add('radiator', 'Radiadores (água e óleo)', U(-2.04, 1.5), left(0), 'end');
+    add('radiator', 'Radiadores (água e óleo)', UB(-2.04, 1.5), left(0), 'end');
     add('travelMotor', 'Motor de translação', () => this.travelPos || [0, 0], left(1), 'end');
-    add('engine', 'Motor diesel', U(-1.55, 1.4), left(2), 'end');
-    add('pumps', 'Bombas principais P1 · P2', U(-0.89, 1.5), left(3), 'end');
-    add('valve', 'Bloco de válvulas', U(0.5, 1.25), right(0), 'start');
-    add('swingMotor', 'Motor de giro', U(0.09, 1.25), right(1), 'start');
+    add('engine', 'Motor diesel', UB(-1.55, 1.34), left(2), 'end');
+    add('pumps', 'Bombas principais P1 · P2', UB(-0.84, 1.28), left(3), 'end');
+    add('valve', 'Bloco de válvulas', UB(0.5, 1.22), right(0), 'start');
+    add('swingMotor', 'Motor de giro', UB(0.09, 1.25), right(1), 'start');
     add('swivel', 'Junta rotativa', U(-0.02, 0.7), right(2), 'start');
-    add('tank', 'Tanque de óleo', U(-0.27, 1.4), right(3), 'start');
-    add('cab', 'Cabine e joysticks', U(0.72, 2.95), () => [this.X(1.45), this.Y(3.55)], 'start');
+    add('tank', 'Tanque de óleo', UB(-0.15, 1.36), right(3), 'start');
+    add('cab', 'Cabine e joysticks', U(0.72, 2.95 + CAB_DY), () => [this.X(1.45), this.Y(3.55 + CAB_DY)], 'start');
+    // etiquetas P1 / P2 sobre as bombas
+    this.pumpTags = PUMP_CX.map((cx, k) => {
+      const t = txt(L, 0, 0, 'P' + (k + 1), { 'text-anchor': 'start', class: 'pump-tag' });
+      return { t, at: [cx + 0.025, 1.8] };
+    });
     add('boomCyl', 'Cilindros da lança', () => this.midCyl('boom'), () => { const m = this.midCyl('boom'); return [m[0] + 62, m[1] + 42]; }, 'start');
     add('armCyl', 'Cilindro do braço', () => this.midCyl('arm'), () => { const m = this.midCyl('arm'); return [m[0] - 20, m[1] - 46]; });
     add('bucketCyl', 'Cilindro da caçamba', () => this.midCyl('bucket'), () => { const m = this.midCyl('bucket'); return [m[0] + 70, m[1] - 18]; }, 'start');
@@ -389,39 +467,48 @@ export class Scene {
     txt(lg, 288, 56, 'bar', { 'text-anchor': 'end', class: 'inset-s' });
     el('line', { x1: 14, y1: 76, x2: 40, y2: 76, stroke: pilotColor(39), 'stroke-width': 4, 'stroke-linecap': 'round' }, lg);
     txt(lg, 48, 80, 'piloto (comando)', { class: 'inset-s' });
-    el('line', { x1: 168, y1: 76, x2: 194, y2: 76, stroke: '#fff', 'stroke-width': 3, 'stroke-dasharray': '2 6', 'stroke-linecap': 'round' }, lg);
-    el('line', { x1: 168, y1: 76, x2: 194, y2: 76, stroke: pColor(150), 'stroke-width': 7, opacity: 0.5 }, lg);
+    el('line', { x1: 168, y1: 76, x2: 194, y2: 76, stroke: pColor(150), 'stroke-width': 4.5 }, lg);
+    el('line', { x1: 168, y1: 76, x2: 194, y2: 76, stroke: '#fff', 'stroke-width': 1.6, 'stroke-dasharray': '2 6', 'stroke-linecap': 'round' }, lg);
     txt(lg, 202, 80, 'sentido do fluxo', { class: 'inset-s' });
 
-    // detalhe do bloco de válvulas
-    const vd = el('g', { transform: 'translate(1060 16)', class: 'comp', 'data-comp': 'valve' }, g);
+    // detalhe do bloco de válvulas (traço fino; carretel, pilotos e pórticos A/B)
+    const VW = 344, ROW = 33;
+    const vd = el('g', { transform: `translate(${SCENE_W - 16 - VW} 16)`, class: 'comp', 'data-comp': 'valve' }, g);
     this.insetValve = vd;
-    el('rect', { width: 324, height: 252, rx: 10, fill: '#ffffffe6', stroke: '#cfd5dc' }, vd);
+    el('rect', { width: VW, height: 50 + 6 * ROW + 34, rx: 10, fill: '#ffffffe6', stroke: '#cfd5dc' }, vd);
     txt(vd, 12, 22, 'BLOCO DE VÁLVULAS (DETALHE)', { class: 'inset-t' });
-    const names2 = { boom: 'Lança', arm: 'Braço', bucket: 'Caçamba', swing: 'Giro', travelL: 'Esteira E', travelR: 'Esteira D' };
+    txt(vd, 140, 38, 'A', { 'text-anchor': 'middle', class: 'inset-s' });
+    txt(vd, 212, 38, 'B', { 'text-anchor': 'middle', class: 'inset-s' });
+    const names2 = { boom: 'Lança', arm: 'Braço', bucket: 'Caçamba', swing: 'Giro (desat.)', travelL: 'Esteira E', travelR: 'Esteira D' };
     this.vd = [];
     VALVE_ORDER.forEach((id, i) => {
-      const y = 44 + i * 30;
-      txt(vd, 12, y + 5, names2[id], { class: 'inset-s' });
-      const pilL = el('rect', { x: 84, y: y - 8, width: 14, height: 16, rx: 2, fill: '#ede9fe', stroke: '#a78bfa' }, vd);
-      el('rect', { x: 100, y: y - 7, width: 132, height: 14, rx: 2, fill: '#59616d' }, vd);
-      const portA = el('rect', { x: 128, y: y - 13, width: 10, height: 6, fill: '#ccc' }, vd);
-      const portB = el('rect', { x: 196, y: y - 13, width: 10, height: 6, fill: '#ccc' }, vd);
+      const y = 56 + i * ROW;
+      txt(vd, 12, y + 4, names2[id], { class: id === 'swing' ? 'inset-s off' : 'inset-s' });
+      // corpo da seção e furo do carretel
+      el('rect', { x: 92, y: y - 12, width: 168, height: 24, rx: 4, fill: '#eef0f3', stroke: '#b8c0ca', 'stroke-width': 0.8 }, vd);
+      el('rect', { x: 108, y: y - 4.5, width: 136, height: 9, rx: 4.5, fill: '#6b7380' }, vd);
+      // pórticos A e B (cor = pressão)
+      const portA = el('rect', { x: 135, y: y - 12, width: 10, height: 7.5, rx: 1.5, stroke: '#4b5563', 'stroke-width': 0.6 }, vd);
+      const portB = el('rect', { x: 207, y: y - 12, width: 10, height: 7.5, rx: 1.5, stroke: '#4b5563', 'stroke-width': 0.6 }, vd);
+      // pilotos nas pontas
+      const pilL = el('rect', { x: 94, y: y - 8, width: 11, height: 16, rx: 2.5, stroke: '#a78bfa', 'stroke-width': 0.8 }, vd);
+      const pilR = el('rect', { x: 247, y: y - 8, width: 11, height: 16, rx: 2.5, stroke: '#a78bfa', 'stroke-width': 0.8 }, vd);
+      // carretel deslizante
       const spool = el('g', {}, vd);
-      el('rect', { x: 0, y: -5, width: 76, height: 10, rx: 2, fill: '#eef1f4', stroke: INK }, spool);
-      el('rect', { x: 22, y: -2.5, width: 10, height: 5, fill: '#9aa3ad' }, spool);
-      el('rect', { x: 44, y: -2.5, width: 10, height: 5, fill: '#9aa3ad' }, spool);
-      const pilR = el('rect', { x: 234, y: y - 8, width: 14, height: 16, rx: 2, fill: '#ede9fe', stroke: '#a78bfa' }, vd);
-      const val = txt(vd, 312, y + 5, '', { 'text-anchor': 'end', class: 'inset-v' });
+      el('rect', { x: 0, y: -3.5, width: 76, height: 7, rx: 3, fill: '#f8fafc', stroke: INK, 'stroke-width': 0.8 }, spool);
+      el('rect', { x: 22, y: -1.8, width: 10, height: 3.6, rx: 1, fill: '#9aa3ad' }, spool);
+      el('rect', { x: 44, y: -1.8, width: 10, height: 3.6, rx: 1, fill: '#9aa3ad' }, spool);
+      const val = txt(vd, VW - 12, y + 4, '', { 'text-anchor': 'end', class: 'inset-v' });
       this.vd.push({ id, y, spool, pilL, pilR, portA, portB, val });
     });
-    txt(vd, 12, 236, 'Alívio', { class: 'inset-s' });
+    const yR = 50 + 6 * ROW + 16;
+    txt(vd, 12, yR + 4, 'Alívio', { class: 'inset-s' });
     this.vdRelief = [0, 1].map((k) => {
-      const c = el('circle', { cx: 74 + k * 80, cy: 232, r: 7, stroke: INK }, vd);
-      txt(vd, 86 + k * 80, 236, 'P' + (k + 1), { class: 'inset-s' });
+      const c = el('circle', { cx: 74 + k * 70, cy: yR, r: 6, stroke: INK, 'stroke-width': 0.8 }, vd);
+      txt(vd, 85 + k * 70, yR + 4, 'P' + (k + 1), { class: 'inset-s' });
       return c;
     });
-    this.vdReliefSet = txt(vd, 312, 236, '', { 'text-anchor': 'end', class: 'inset-v' });
+    this.vdReliefSet = txt(vd, VW - 12, yR + 4, '', { 'text-anchor': 'end', class: 'inset-v' });
 
     // indicação do setor visto
     this.viewTxt = txt(g, 16, SCENE_H - 16, '', { class: 'view-t' });
@@ -503,37 +590,35 @@ export class Scene {
 
     // ---- estrutura superior ----
     this.gUpper.setAttribute('transform', `translate(${this.X(0)} ${OY}) scale(${S} ${-S})`);
-    const n = st.eng.rpm;
-    this.flyAng = (this.flyAng || 0) + (n / 60) * 2 * Math.PI * dt * 0.08; // ainda giratório, mas legível
-    this.flyMark.setAttribute('x2', -1.17 + Math.sin(this.flyAng) * 0.12);
-    this.flyMark.setAttribute('y2', 1.65 + Math.cos(this.flyAng) * 0.12);
-    st.pumps.forEach((pu, k) => {
-      this.pumpBody[k].setAttribute('fill', pColor(pu.p));
-      const frac = pu.qGeom > 1 ? pu.q / pu.qGeom : 0;
-      const cx = k === 0 ? -1.0 : -0.78, cy = 1.65, ang = (frac * 22 * Math.PI) / 180;
-      this.swash[k].setAttribute('x1', cx - Math.sin(ang) * 0.15); this.swash[k].setAttribute('y1', cy - Math.cos(ang) * 0.15);
-      this.swash[k].setAttribute('x2', cx + Math.sin(ang) * 0.15); this.swash[k].setAttribute('y2', cy + Math.cos(ang) * 0.15);
-    });
+    // área da carcaça: o pé da lança fica translúcido aqui
+    this.boomHole.setAttribute('x', this.X(HOUSE.x0)); this.boomHole.setAttribute('y', this.Y(HOUSE.top));
+    this.boomHole.setAttribute('width', (HOUSE.x1 - HOUSE.x0) * S); this.boomHole.setAttribute('height', (HOUSE.top - 1.08) * S);
+    const e = st.eng, n = e.rpm;
+    // rotação desenhada mais lenta que a real, para dar para acompanhar
+    this.flyAng = (this.flyAng || 0) + (n / 60) * 2 * Math.PI * dt * 0.08;
+    this.flyMark.setAttribute('x2', -1.22 + Math.sin(this.flyAng) * 0.1);
+    this.flyMark.setAttribute('y2', SHAFT_Y + Math.cos(this.flyAng) * 0.1);
+    this.updateEngine(st);
+    this.updatePumps(st);
     this.pilotPumpBody.setAttribute('fill', pilotColor(st.pilot.supply));
     this.lockBody.setAttribute('fill', st.locked ? '#d62828' : '#22a06b');
-    const lvl = Math.max(0.05, Math.min(1, (st.oil.tank - 70) / 100));
-    const oilH = 0.78 * lvl;
-    this.tankOil.setAttribute('height', oilH);
-    const wy2 = 1.32 + oilH;
-    this.tankWave.setAttribute('x1', -0.46); this.tankWave.setAttribute('x2', -0.08);
-    this.tankWave.setAttribute('y1', wy2); this.tankWave.setAttribute('y2', wy2);
+    this.updateTank(st, dt);
     this.cooler.setAttribute('fill', st.oil.T > 90 ? '#f08a5d' : st.oil.T > 70 ? '#f6c177' : '#9cc3e6');
     const sw = st.f.swing;
     this.swingBody.setAttribute('fill', pColor(Math.max(sw.pA, sw.pB)));
     VALVE_ORDER.forEach((id, i) => {
-      const f = st.f[id];
+      const f = st.f[id], s = this.spools[i];
       const shift = f.s * (f.dir || 0) * 0.1;
-      this.spools[i].sp.setAttribute('x', 0.38 + shift);
-      this.spools[i].sp.setAttribute('fill', f.s > 0.02 ? '#ffe9a8' : '#eef1f4');
-      this.spools[i].pil.setAttribute('fill', pilotColor(f.pp));
+      s.sp.setAttribute('x', 0.37 + shift);
+      s.sp.setAttribute('fill', f.s > 0.02 ? '#ffe08a' : '#eef1f4');
+      s.pilL.setAttribute('fill', f.dir > 0 ? pilotColor(f.pp) : '#ede9fe');
+      s.pilR.setAttribute('fill', f.dir < 0 ? pilotColor(f.pp) : '#ede9fe');
+      s.pA.setAttribute('fill', pColor(f.pA));
+      s.pB.setAttribute('fill', pColor(f.pB));
     });
     st.pumps.forEach((pu, k) => this.reliefLamp[k].setAttribute('fill', pu.relief > 5 ? '#d62828' : '#e5e7eb'));
     this.joyMark.setAttribute('x2', 0.42 + (st.input.rightX + st.input.leftX) * 0.04);
+    this.updateSmoke(st, dt);
 
     // ---- lança / braço / caçamba ----
     const B0 = P(g.B0), A0 = P(g.A0), K0 = P(g.K0);
@@ -571,6 +656,145 @@ export class Scene {
     this.updateInsets(st, sector);
   }
 
+  // Motor de 4 tempos, 4 cilindros (ordem de ignição 1-3-4-2).
+  // Cada pistão segue o virabrequim; a câmara acende laranja na explosão.
+  updateEngine(st) {
+    const e = st.eng, P = st.params;
+    const load = e.running ? Math.min(1, e.outKW / P.engineKW) : 0;
+    const r = 0.07, L = 0.26;                       // meio curso e comprimento da biela
+    const cyc = ((this.flyAng % (4 * Math.PI)) + 4 * Math.PI) % (4 * Math.PI);
+    const offs = [0, 3 * Math.PI, Math.PI, 2 * Math.PI];
+    this.cyls.forEach((c, i) => {
+      const a = cyc - offs[i];
+      const cx = c.xc + r * Math.sin(a), cy = SHAFT_Y + r * Math.cos(a);
+      const pinY = cy + Math.sqrt(L * L - (r * Math.sin(a)) ** 2);
+      c.piston.setAttribute('y', pinY - 0.03);
+      c.rod.setAttribute('x1', cx); c.rod.setAttribute('y1', cy);
+      c.rod.setAttribute('x2', c.xc); c.rod.setAttribute('y2', pinY);
+      c.pin.setAttribute('cx', cx); c.pin.setAttribute('cy', cy);
+      const topY = pinY + 0.06;
+      c.gas.setAttribute('y', topY); c.gas.setAttribute('height', Math.max(0, 1.975 - topY));
+      const ph = ((a % (4 * Math.PI)) + 4 * Math.PI) % (4 * Math.PI);
+      const burn = e.running && ph < 0.9 * Math.PI ? (1 - ph / (0.9 * Math.PI)) * (0.45 + 0.55 * load) : 0;
+      c.gas.setAttribute('fill', mix('#e3e7ec', '#ff8c2e', burn));
+    });
+    this.stackGlow.setAttribute('opacity', e.running ? (0.15 + 0.5 * load).toFixed(2) : 0);
+  }
+
+  // Bombas de pistões axiais: o ângulo da placa inclinada define o curso dos pistões (a vazão).
+  updatePumps(st) {
+    st.pumps.forEach((pu, k) => {
+      const g = this.pumpG[k], cx = g.cx;
+      const frac = pu.qGeom > 1 ? Math.min(1, pu.q / pu.qGeom) : 0;
+      const col = pColor(pu.p);
+      g.inner.setAttribute('fill', col); g.inner.setAttribute('fill-opacity', 0.28);
+      g.port.setAttribute('fill', col); g.outlet.setAttribute('fill', col);
+      const ang = (frac * 20 * Math.PI) / 180;
+      const sx = cx - 0.075;
+      g.swash.setAttribute('x1', sx - Math.sin(ang) * 0.19); g.swash.setAttribute('y1', SHAFT_Y - Math.cos(ang) * 0.19);
+      g.swash.setAttribute('x2', sx + Math.sin(ang) * 0.19); g.swash.setAttribute('y2', SHAFT_Y + Math.cos(ang) * 0.19);
+      g.pistons.forEach((p, j) => {
+        const dy = (j - 1) * 0.11;
+        // o pé do pistão encosta na placa: placa mais inclinada → pistão vai e vem mais
+        const wob = Math.sin(this.flyAng * 1.5 + j * 2.09 + k);
+        const left = sx + Math.tan(ang) * dy + 0.012 + Math.abs(Math.tan(ang)) * 0.06 * wob;
+        p.setAttribute('x', left); p.setAttribute('width', Math.max(0.02, cx + 0.05 - left));
+      });
+    });
+  }
+
+  // Tanque: nível real, superfície ondulando, jato do filtro de retorno, bolhas e a sucção puxando óleo.
+  updateTank(st, dt) {
+    const t = st.t, retQ = st.oil.returnQ;
+    const sucQ = st.pumps[0].q + st.pumps[1].q;
+    const lvl = Math.max(0.05, Math.min(1, (st.oil.tank - 70) / 100));
+    const surf = TANK.y0 + 0.78 * lvl;
+    const fr = Math.min(1, retQ / 250);
+    const A = 0.004 + 0.012 * fr + 0.004 * Math.min(1, sucQ / 400);
+    const pts = [];
+    for (let i = 0; i <= 16; i++) {
+      const x = TANK.x0 + ((TANK.x1 - TANK.x0) * i) / 16;
+      const bump = 0.02 * fr * Math.exp(-(((x - TANK.filterX) / 0.05) ** 2)) * Math.sin(t * 13);
+      pts.push([x, surf + A * Math.sin(x * 55 - t * 4.2) + bump]);
+    }
+    const top = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(4) + ' ' + p[1].toFixed(4)).join(' ');
+    this.tankWave.setAttribute('d', top);
+    this.tankOil.setAttribute('d', `${top} L${TANK.x1} ${TANK.y0} L${TANK.x0} ${TANK.y0} Z`);
+    // jato de óleo caindo do filtro de retorno
+    const submerged = surf >= TANK.filterY - 0.01;
+    if (retQ > 2 && !submerged) {
+      this.streamOff -= (0.6 + 1.4 * fr) * dt;
+      this.tankStream.setAttribute('y2', surf);
+      this.tankStream.setAttribute('stroke-width', ((1.2 + 4 * fr) / (S * BODY.k)).toFixed(4));
+      this.tankStream.setAttribute('stroke-dashoffset', this.streamOff.toFixed(4));
+      this.tankStream.setAttribute('visibility', 'visible');
+    } else this.tankStream.setAttribute('visibility', 'hidden');
+    // bolhas: nascem onde o óleo chega e sobem até a superfície
+    this.bubbleAcc += dt * Math.min(25, retQ / 12);
+    while (this.bubbleAcc > 1 && this.bubbles.length < 18) {
+      this.bubbleAcc -= 1;
+      const y0 = submerged ? TANK.filterY - 0.01 : surf - 0.03 - Math.random() * 0.06;
+      const b = { x: TANK.filterX + (Math.random() - 0.5) * 0.05, y: Math.max(TANK.y0 + 0.02, y0), r: 0.006 + Math.random() * 0.008, ph: Math.random() * 6 };
+      b.e = el('circle', { ...NSS, r: b.r, fill: '#e3f0fc', 'fill-opacity': 0.85, stroke: '#ffffff', 'stroke-width': 0.6 }, this.gBubbles);
+      this.bubbles.push(b);
+    }
+    if (this.bubbleAcc > 1) this.bubbleAcc = 1;
+    this.bubbles = this.bubbles.filter((b) => {
+      b.y += 0.14 * dt; b.x += Math.sin(t * 7 + b.ph) * 0.03 * dt;
+      if (b.y > surf - b.r) { b.e.remove(); return false; }
+      b.e.setAttribute('cx', b.x.toFixed(4)); b.e.setAttribute('cy', b.y.toFixed(4));
+      return true;
+    });
+    // sucção: pontinhos escorrendo em espiral para a tela de sucção
+    this.sucPh = (this.sucPh || 0) + dt * Math.min(1.4, sucQ / 300);
+    const [sx, sy] = TANK.strainer;
+    this.suctionDots.forEach((d, j) => {
+      const p = (this.sucPh + j / this.suctionDots.length) % 1;
+      const rr = 0.15 * (1 - p), th = -0.2 + j * 0.27 + p * 1.6;
+      const x = sx + rr * Math.cos(th) + 0.02, y = sy + rr * Math.sin(th) * 0.9;
+      const ok = sucQ > 3 && y < surf - 0.01 && x < TANK.x1;
+      d.setAttribute('cx', x.toFixed(4)); d.setAttribute('cy', y.toFixed(4));
+      d.setAttribute('visibility', ok ? 'visible' : 'hidden');
+      d.setAttribute('opacity', (0.3 + 0.7 * p).toFixed(2));
+    });
+  }
+
+  // Fumaça do escapamento: mais rotação → mais fumaça e mais rápida; mais carga → mais escura.
+  updateSmoke(st, dt) {
+    const e = st.eng, P = st.params;
+    const rpmF = Math.max(0, Math.min(1, (e.rpm - P.idleRpm) / (P.ratedRpm - P.idleRpm)));
+    const load = e.running ? Math.min(1, e.outKW / P.engineKW) : 0;
+    const cranking = !e.running && e.rpm > 80;
+    const rate = e.running ? 5 + 26 * rpmF + 8 * load : cranking ? 9 : 0;   // baforadas por segundo
+    const [ox, oy] = this.P(H(STACK_TOP));
+    this.smokeAcc += rate * dt;
+    while (this.smokeAcc > 1) {
+      this.smokeAcc -= 1;
+      if (this.smoke.length > 140) break;
+      const dark = cranking ? 0.8 : Math.min(1, 0.15 + 0.85 * load);
+      const p = {
+        x: ox + (Math.random() - 0.5) * 3, y: oy,
+        vx: -6 - Math.random() * 10, vy: -(38 + 85 * rpmF + Math.random() * 18),
+        r: 2.5 + 2 * load, grow: 9 + 14 * rpmF, age: 0, life: 1.3 + 1.1 * rpmF + Math.random() * 0.4,
+        a0: 0.22 + 0.33 * Math.max(rpmF, load) + (cranking ? 0.25 : 0),
+      };
+      p.e = el('circle', { fill: mix('#b9bec6', '#3f444c', dark) }, this.gSmoke);
+      this.smoke.push(p);
+    }
+    if (this.smokeAcc > 1) this.smokeAcc = 1;
+    this.smoke = this.smoke.filter((p) => {
+      p.age += dt;
+      if (p.age > p.life) { p.e.remove(); return false; }
+      p.vy *= Math.exp(-dt * 0.9); p.vx -= 6 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.grow * dt;
+      const k = p.age / p.life;
+      p.e.setAttribute('cx', p.x.toFixed(1)); p.e.setAttribute('cy', p.y.toFixed(1));
+      p.e.setAttribute('r', p.r.toFixed(1));
+      p.e.setAttribute('opacity', (p.a0 * Math.min(1, p.age * 8) * (1 - k)).toFixed(3));
+      return true;
+    });
+  }
+
   cylPorts(id) {
     const c = this.geo.cyl[id];
     const u = [(c.end[0] - c.base[0]) / c.L, (c.end[1] - c.base[1]) / c.L];
@@ -586,44 +810,47 @@ export class Scene {
     const B = (x, y) => tf(g.B0, g.tb, [x, y]);
     const Ar = (x, y) => tf(g.A0, g.ta, [x, y]);
     const map = (arr) => arr.map(P);
+    const mapH = (arr) => arr.map((p) => P(H(p)));   // pontos dentro da carcaça ampliada
     const pu = st.pumps;
     // sucção, pressão, retorno
-    this.h.suction.update(map([[-0.4, 1.3], [-0.4, 1.22], [-0.89, 1.22], [-0.89, 1.45]]), 1, pu[0].q + pu[1].q, dt);
-    this.h.p1.update(map([[-1.0, 1.85], [-1.0, 2.33], [0.3, 2.33], [0.3, 2.0]]), pu[0].p, pu[0].q, dt);
-    this.h.p2.update(map([[-0.78, 1.85], [-0.78, 2.23], [0.4, 2.23], [0.4, 2.0]]), pu[1].p, pu[1].q, dt);
+    this.h.suction.update(mapH([[-0.4, 1.3], [-0.4, 1.19], [-0.84, 1.19], [-0.84, 1.24]]), 1, pu[0].q + pu[1].q, dt);
+    this.h.p1.update(mapH([[PUMP_CX[0], 1.79], [PUMP_CX[0], 2.33], [0.3, 2.33], [0.3, VALVE.y1]]), pu[0].p, pu[0].q, dt);
+    this.h.p2.update(mapH([[PUMP_CX[1], 1.79], [PUMP_CX[1], 2.23], [0.4, 2.23], [0.4, VALVE.y1]]), pu[1].p, pu[1].q, dt);
     const retP = 2 + st.oil.returnQ * 0.02;
-    this.h.ret.update(map([[0.7, 1.2], [0.7, 1.12], [-2.035, 1.12], [-2.035, 1.2]]).concat([]), retP, st.oil.returnQ, dt);
-    if (!this.h.ret2) this.h.ret2 = new Hose(this.gHosesBody, 8, 'return', 'hoseReturn');
-    this.h.ret2.update(map([[-2.035, 1.8], [-2.035, 1.84], [-1.95, 1.84], [-1.95, 2.5], [-0.22, 2.5], [-0.22, 2.08]]), retP * 0.6, st.oil.returnQ, dt);
+    this.h.ret.update(mapH([[0.7, VALVE.y0], [0.7, 1.12], [-2.035, 1.12], [-2.035, 1.2]]), retP, st.oil.returnQ, dt);
+    this.h.ret2.update(mapH([[-2.035, 1.8], [-2.035, 1.84], [-1.95, 1.84], [-1.95, 2.5], [TANK.filterX, 2.5], [TANK.filterX, TANK.filterY + 0.18]]), retP * 0.6, st.oil.returnQ, dt);
     // piloto
     const pl = st.pilot;
     const pilotFlow = pl.supply > 1 ? 8 : 0;
-    this.h.pilotSup.update(map([[-0.62, 1.75], [-0.62, 2.42], [-0.02, 2.42]]), pl.supply, pilotFlow, dt);
-    this.h.pilotOut.update(map([[0.11, 2.42], [0.42, 2.42], [0.42, 2.6]]), pl.out, pl.out > 1 ? 6 : 0, dt);
+    const cabFloor = HOUSE.top;
+    this.h.pilotSup.update(mapH([[-0.555, 1.58], [-0.555, 2.42], [-0.02, 2.42]]), pl.supply, pilotFlow, dt);
+    const lockOut = H([0.11, 2.42]);
+    this.h.pilotOut.update(map([lockOut, [0.42, lockOut[1]], [0.42, cabFloor]]), pl.out, pl.out > 1 ? 6 : 0, dt);
     VALVE_ORDER.forEach((id, i) => {
       const f = st.f[id];
-      const x = 0.5 + i * 0.05;
-      this.hp[i].update(map([[x, 2.6], [x, VALVE.y1 + 0.01]]), f.pp, f.s > 0.02 ? 5 : 0, dt);
+      const x = 0.45 + i * 0.045;
+      this.hp[i].update(mapH([[x, 2.6], [x, VALVE.y1 + 0.005]]), f.pp, f.s > 0.02 ? 5 : 0, dt);
     });
-    // linhas de trabalho
-    const portA = (i) => [VALVE.x1, secY(i) + 0.03];
-    const portB = (i) => [VALVE.x1, secY(i) - 0.03];
+    // linhas de trabalho (saem dos pórticos A/B do bloco, na carcaça, e sobem pela lança)
+    const portA = (i) => H([VALVE.x1 + 0.02, secY(i) + 0.031]);
+    const portB = (i) => H([VALVE.x1 + 0.02, secY(i) - 0.031]);
     const flowA = (f) => (f.dir > 0 ? f.q : f.dir < 0 ? -f.qOut : 0) + (f.leak && f.pA > f.pB ? -f.leak : 0);
     const flowB = (f) => (f.dir < 0 ? f.q : f.dir > 0 ? -f.qOut : 0) + (f.leak && f.pB >= f.pA ? -f.leak : 0);
     const iB = VALVE_ORDER.indexOf('bucket'), iA = VALVE_ORDER.indexOf('arm'), iM = VALVE_ORDER.indexOf('boom');
+    const col = (x, i, a) => H([x, secY(i) + (a ? 0.031 : -0.031)]);
     // caçamba
     {
       const f = st.f.bucket, cp = this.cylPorts('bucket');
-      const A = [portA(iB), [0.84, portA(iB)[1]], [0.84, 2.18], B(0.4, 0.5), B(2.0, 0.92), B(4.2, 0.72), B(5.55, 0.42), Ar(-0.05, 0.62), cp.at(0.12, 0.0)];
-      const Bp = [portB(iB), [0.87, portB(iB)[1]], [0.87, 2.14], B(0.45, 0.43), B(2.0, 0.85), B(4.2, 0.65), B(5.5, 0.36), Ar(-0.05, 0.54), cp.at(0.2, 0.1), cp.at(cp.Lb - 0.1, 0.1), cp.at(cp.Lb - 0.1, 0)];
+      const A = [portA(iB), col(0.88, iB, 1), H([0.88, 2.18]), B(0.4, 0.5), B(2.0, 0.92), B(4.2, 0.72), B(5.55, 0.42), Ar(-0.05, 0.62), cp.at(0.12, 0.0)];
+      const Bp = [portB(iB), col(0.91, iB, 0), H([0.91, 2.14]), B(0.45, 0.43), B(2.0, 0.85), B(4.2, 0.65), B(5.5, 0.36), Ar(-0.05, 0.54), cp.at(0.2, 0.1), cp.at(cp.Lb - 0.1, 0.1), cp.at(cp.Lb - 0.1, 0)];
       this.hw.bucket[0].update(map(A), f.pA, flowA(f), dt);
       this.hw.bucket[1].update(map(Bp), f.pB, flowB(f), dt);
     }
     // braço
     {
       const f = st.f.arm, cp = this.cylPorts('arm');
-      const A = [portA(iA), [0.92, portA(iA)[1]], [0.92, 2.1], B(0.5, 0.36), B(1.9, 0.76), cp.at(-0.05, 0.15), cp.at(0.12, 0)];
-      const Bp = [portB(iA), [0.95, portB(iA)[1]], [0.95, 2.06], B(0.55, 0.3), B(1.9, 0.7), cp.at(0.2, 0.13), cp.at(cp.Lb - 0.1, 0.13), cp.at(cp.Lb - 0.1, 0)];
+      const A = [portA(iA), col(0.95, iA, 1), H([0.95, 2.1]), B(0.5, 0.36), B(1.9, 0.76), cp.at(-0.05, 0.15), cp.at(0.12, 0)];
+      const Bp = [portB(iA), col(0.98, iA, 0), H([0.98, 2.06]), B(0.55, 0.3), B(1.9, 0.7), cp.at(0.2, 0.13), cp.at(cp.Lb - 0.1, 0.13), cp.at(cp.Lb - 0.1, 0)];
       this.hw.arm[0].update(map(A), f.pA, flowA(f), dt);
       this.hw.arm[1].update(map(Bp), f.pB, flowB(f), dt);
       this.armHoseMid = P(B(1.2, 0.6));
@@ -631,18 +858,18 @@ export class Scene {
     // lança
     {
       const f = st.f.boom, cp = this.cylPorts('boom');
-      const A = [portA(iM), [0.98, portA(iM)[1]], cp.at(0.12, 0.14), cp.at(0.12, 0)];
-      const Bp = [portB(iM), [0.94, portB(iM)[1]], [0.94, 1.36], cp.at(0.35, 0.16), cp.at(cp.Lb - 0.1, 0.16), cp.at(cp.Lb - 0.1, 0)];
+      const A = [portA(iM), col(1.02, iM, 1), cp.at(0.12, 0.14), cp.at(0.12, 0)];
+      const Bp = [portB(iM), col(0.97, iM, 0), H([0.97, 1.3]), cp.at(0.35, 0.16), cp.at(cp.Lb - 0.1, 0.16), cp.at(cp.Lb - 0.1, 0)];
       this.hw.boom[0].update(map(A), f.pA, flowA(f), dt);
       this.hw.boom[1].update(map(Bp), f.pB, flowB(f), dt);
     }
     // giro
     {
       const f = st.f.swing, i = VALVE_ORDER.indexOf('swing');
-      this.hw.swing[0].update(map([[VALVE.x0, secY(i) + 0.03], [0.13, secY(i) + 0.03]]), f.pA, flowA(f), dt);
-      this.hw.swing[1].update(map([[VALVE.x0, secY(i) - 0.03], [0.13, secY(i) - 0.03]]), f.pB, flowB(f), dt);
+      this.hw.swing[0].update(mapH([[VALVE.x0, secY(i) + 0.03], [0.13, secY(i) + 0.03]]), f.pA, flowA(f), dt);
+      this.hw.swing[1].update(mapH([[VALVE.x0, secY(i) - 0.03], [0.13, secY(i) - 0.03]]), f.pB, flowB(f), dt);
     }
-    // translação: passa pela junta rotativa até o motor da esteira
+    // translação: desce pela junta rotativa (fora da carcaça) até o motor da esteira
     const rear = this.travelPos;
     const rearL = [(rear[0] - this.X(0)) / S, 0.46];
     ['travelL', 'travelR'].forEach((id, k) => {
@@ -650,7 +877,8 @@ export class Scene {
       [0, 1].forEach((side) => {
         const o = (k * 2 + side) * 0.03 - 0.045;
         const y0 = secY(i) + (side ? -0.03 : 0.03);
-        const pts = [[VALVE.x0, y0], [0.17 - (k * 2 + side) * 0.0, y0], [0.17, 1.12], [o, 1.12], [o, 0.62], [rearL[0] + 0.25, 0.62 - (k * 2 + side) * 0.0], [rearL[0] + 0.2, rearL[1] + 0.06]];
+        const low = H([o, 1.12]);
+        const pts = [H([VALVE.x0, y0]), H([0.155, y0]), H([0.155, 1.12]), low, [low[0], 0.62], [rearL[0] + 0.25, 0.62], [rearL[0] + 0.2, rearL[1] + 0.06]];
         this.hw[id][side].update(map(pts), side ? f.pB : f.pA, side ? flowB(f) : flowA(f), dt);
       });
     });
@@ -686,6 +914,10 @@ export class Scene {
 
   updateLabels() {
     if (!this.layers.labels) return;
+    for (const pt of this.pumpTags) {
+      const q = this.P(H(pt.at));
+      pt.t.setAttribute('x', q[0].toFixed(1)); pt.t.setAttribute('y', q[1].toFixed(1));
+    }
     for (const l of this.labels) {
       const a = l.anchorFn(), p = l.posFn();
       l.dot.setAttribute('cx', a[0]); l.dot.setAttribute('cy', a[1]);
@@ -722,9 +954,9 @@ export class Scene {
       const off = { boom: [10, 10], arm: [30, -40], bucket: [18, 24] }[id];
       put(id, m[0] + off[0], m[1] + off[1], `A ${fmt(f.pA)} · B ${fmt(f.pB)} bar`);
     }
-    const p1 = this.P([-1.05, 3.45]);
-    put('p1', p1[0] - 150, p1[1] - 6, `P1 ${fmt(st.pumps[0].p)} bar · ${fmt(st.pumps[0].q)} L/min`);
-    put('p2', p1[0] - 150, p1[1] + 20, `P2 ${fmt(st.pumps[1].p)} bar · ${fmt(st.pumps[1].q)} L/min`);
+    const p1 = this.P([HOUSE.x0 - 0.7, 2.75]);
+    put('p1', p1[0] - 178, p1[1] - 6, `P1 ${fmt(st.pumps[0].p)} bar · ${fmt(st.pumps[0].q)} L/min`);
+    put('p2', p1[0] - 178, p1[1] + 20, `P2 ${fmt(st.pumps[1].p)} bar · ${fmt(st.pumps[1].q)} L/min`);
   }
 
   updateInsets(st, sector) {
@@ -738,7 +970,7 @@ export class Scene {
     for (const r of this.vd) {
       const f = st.f[r.id];
       const shift = f.s * (f.dir || 0) * 28;
-      r.spool.setAttribute('transform', `translate(${128 + shift} ${r.y})`);
+      r.spool.setAttribute('transform', `translate(${138 + shift} ${r.y})`);
       r.pilL.setAttribute('fill', f.dir > 0 ? pilotColor(f.pp) : '#ede9fe');
       r.pilR.setAttribute('fill', f.dir < 0 ? pilotColor(f.pp) : '#ede9fe');
       r.portA.setAttribute('fill', pColor(f.pA));

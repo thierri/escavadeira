@@ -53,7 +53,7 @@ export function createState(params) {
   const st = {
     t: 0,
     params,
-    key: 0, throttle: 7, mode: 'S', locked: true, boost: false, autoIdle: true,
+    key: 0, throttle: 7, mode: 'S', locked: false, boost: false, autoIdle: true,
     input: { leftX: 0, leftY: 0, rightX: 0, rightY: 0, travelL: 0, travelR: 0 },
     eng: { running: false, rpm: 0, target: 0, integ: 0, torque: 0, loadKW: 0, outKW: 0,
       availKW: 0, coolant: params.ambientC, fuelLh: 0, stalled: false, idleTimer: 0, autoIdling: false },
@@ -116,8 +116,9 @@ export function step(st, dt) {
   // ---------- 1. Comandos (padrão ISO) ----------
   const inp = st.input;
   const cmd = {
-    boom: -inp.rightY, bucket: -inp.rightX, arm: -inp.leftY, swing: inp.leftX,
-    travelL: inp.travelL, travelR: inp.travelR,
+    // giro desabilitado (vista 2D); esteiras sempre juntas, só frente/trás
+    boom: -inp.rightY, bucket: -inp.rightX, arm: -inp.leftY, swing: 0,
+    travelL: inp.travelL, travelR: inp.travelL,
   };
   const anyInput = Object.values(cmd).some((v) => Math.abs(v) > 0.05);
   e.idleTimer = anyInput ? 0 : e.idleTimer + dt;
@@ -371,7 +372,7 @@ export function step(st, dt) {
     }
   }
   const vAvg = (st.trackV[0] + st.trackV[1]) / 2;
-  st.heading += ((st.trackV[0] - st.trackV[1]) / 2.6) * dt;
+  // rumo fixo: no simulador 2D a máquina não vira (só frente/trás)
   st.mx = clamp(st.mx + vAvg * Math.cos(st.swing.ang) * dt, -2.5, 2.5);
   for (const pu of st.pumps) returnQ += pu.oc + pu.relief;
   st.oil.returnQ = returnQ;
@@ -412,7 +413,7 @@ export function step(st, dt) {
   const A = st.alerts;
   A.relief0 = st.pumps[0].relief > 5;
   A.relief1 = st.pumps[1].relief > 5;
-  A.lock = st.locked;
+  A.idle = e.autoIdling;
   A.hot = st.oil.T > 95;
   A.cav = st.pumps[0].cav || st.pumps[1].cav;
   A.stall = e.stalled;
