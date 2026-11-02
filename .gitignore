@@ -1,0 +1,17 @@
+# sistema
+.DS_Store
+Thumbs.db
+
+# editores
+.vscode/
+.idea/
+*.swp
+
+# configurações locais do Claude Code (o launch.json do preview pode ir para o repositório)
+.claude/settings.local.json
+
+# gravações e exportações de vídeo
+*.mp4
+*.mov
+*.webm
+exports/

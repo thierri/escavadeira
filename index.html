@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escavadeira Hidráulica</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Palco fixo 1920×1080 (16:9), escalado para caber na janela, sem rolagem -->
+  <div id="stage">
+    <header id="topbar">
+      <h1>Escavadeira hidráulica <span>· como funciona</span></h1>
+      <div class="group" id="layers">
+        <span class="glabel">Mostrar</span>
+        <button class="chip on" data-layer="hoses">Mangueiras</button>
+        <button class="chip on" data-layer="pilot">Piloto</button>
+        <button class="chip on" data-layer="labels">Nomes</button>
+        <button class="chip on" data-layer="values">Valores</button>
+      </div>
+      <div class="group" id="speed">
+        <span class="glabel">Velocidade</span>
+        <button class="chip" data-speed="0.25">¼×</button>
+        <button class="chip" data-speed="0.5">½×</button>
+        <button class="chip on" data-speed="1">1×</button>
+        <button class="chip" data-speed="2">2×</button>
+        <button class="chip" id="pause">Pausar</button>
+      </div>
+      <div class="group" id="sound">
+        <span class="glabel">Som</span>
+        <button class="chip on" id="btn-sound">Ligado</button>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.8" aria-label="Volume">
+      </div>
+      <div class="group right">
+        <button class="chip" id="btn-present">▶ Apresentação</button>
+        <button class="chip" id="btn-params">Parâmetros</button>
+        <button class="chip" id="btn-reset">Reiniciar</button>
+      </div>
+    </header>
+    <svg id="scene" width="1400" height="784" viewBox="0 0 1400 784"></svg>
+    <svg id="overlay" width="1400" height="784" viewBox="0 0 1400 784"></svg>
+    <svg id="panel" width="520" height="784" viewBox="0 0 520 784"></svg>
+    <div id="drawer"></div>
+    <footer id="controls"></footer>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
