@@ -11,8 +11,7 @@ Ele tem dois usos:
 Tudo cabe numa única tela **16:9 (1920×1080)**, sem rolagem, em estilo técnico e limpo, com textos em
 português para um público leigo e curioso.
 
-> Este é o primeiro de uma série de diagramas de "máquinas curiosas". O método completo para criar os
-> próximos está em [`docs/guia-diagramas-interativos.md`](docs/guia-diagramas-interativos.md).
+> Este é o primeiro de uma série de diagramas de "máquinas curiosas".
 
 ---
 
@@ -137,7 +136,6 @@ enquadramentos e movimentos, não é preciso mexer no restante do código.
 - [x] Parâmetros ajustáveis e 4 falhas simuláveis
 - [x] Sistema de som sintetizado
 - [x] Modo apresentação com 10 cenas roteirizadas
-- [x] Guia de método para outras máquinas ([`docs/guia-diagramas-interativos.md`](docs/guia-diagramas-interativos.md))
 
 **Ainda não validado por uma pessoa**
 
@@ -180,8 +178,7 @@ escavadeira/
 │   └── present/
 │       ├── presentation.js   motor do modo apresentação
 │       └── scenes.js         roteiro das cenas
-└── docs/
-    └── guia-diagramas-interativos.md   método completo (layout, cores, física, som, apresentação)
+└── video/                    pipeline do vídeo narrado (HyperFrames)
 ```
 
 Princípios que mantêm o código organizado:
@@ -211,8 +208,7 @@ sim.reset()            // reinicia a simulação
 
 1. Clone o repositório.
 2. Rode `python3 -m http.server 8765` dentro da pasta e abra `http://localhost:8765`.
-3. Leia este README e o guia em `docs/` para retomar o contexto. As decisões de projeto, o porquê de cada
-   técnica e as armadilhas já encontradas estão documentadas lá.
+3. Leia este README para retomar o contexto.
 
 Requisitos: um navegador moderno (Chrome, Edge ou Safari recentes) e Python 3 (ou qualquer servidor
 estático). Não há dependências para instalar.
