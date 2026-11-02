@@ -133,12 +133,13 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 
 /* ---------- destaque (modo apresentação) ---------- */
 #scene [data-comp], #overlay [data-comp] { transition: opacity .6s ease; }
-#scene.dim [data-comp]:not(.focus), #overlay.dim [data-comp]:not(.focus) { opacity: .13; }
+#scene.dim [data-comp]:not(.focus), #overlay.dim [data-comp]:not(.focus), #scene.dim .values { opacity: .13; }
 
 /* ---------- modo apresentação ---------- */
 #stage.clean #topbar, #stage.clean #panel, #stage.clean #controls, #stage.clean #drawer { display: none; }
 #stage.clean #scene, #stage.clean #overlay { top: 0; width: 1920px; height: 1080px; }
 #stage.presenting #drawer { display: none; }
+#stage.presenting #drawer.open { display: flex; }   /* aberta pelo roteiro */
 
 .pcap {
   position: absolute; left: 1322px; top: 850px; width: 586px; height: 220px; overflow: hidden;
@@ -166,6 +167,28 @@ input[type=range] { width: 100%; accent-color: var(--ink); }
 .phint.show { opacity: 1; }
 .pbar { position: absolute; left: 0; bottom: 0; width: 1920px; height: 5px; background: rgba(0,0,0,.08); opacity: 0; transition: opacity .4s ease; }
 .pbar.show { opacity: 1; }
+.pspot {
+  position: absolute; z-index: 20; pointer-events: none; border-radius: 14px;
+  border: 3px solid var(--accent); box-shadow: 0 0 0 4000px rgba(15,23,42,.5), 0 0 18px rgba(242,183,5,.6);
+  opacity: 0; transition: left .6s ease, top .6s ease, width .6s ease, height .6s ease, opacity .35s ease;
+}
+.pspot.show { opacity: 1; }
+.pspot.jump { transition: opacity .35s ease; }
+.pcap { z-index: 30; }
+/* modo vídeo: nenhuma transição CSS (o roteiro controla tudo por tempo de quadro) */
+#stage.video *, #stage.video .pcap, #stage.video .pspot, #stage.video .plink { transition: none !important; animation: none !important; }
+#stage.video .phint, #stage.video .pbar { display: none !important; }
+.plink {
+  position: absolute; z-index: 25; left: 700px; top: 92px; transform: translate(-50%, -8px);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none;
+  background: var(--ink); color: #fff; border: 3px solid var(--accent); border-radius: 18px;
+  padding: 14px 34px 16px; box-shadow: 0 10px 30px rgba(15,23,42,.25);
+  opacity: 0; transition: opacity .45s ease, transform .45s ease;
+}
+.plink.show { opacity: 1; transform: translate(-50%, 0); }
+.plink span { font: 700 14px var(--font); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.plink b { font: 800 34px var(--font); letter-spacing: -0.01em; }
+.phint, .pbar { z-index: 31; }
 .pbar-f { height: 100%; width: 0; background: var(--accent); }
 #btn-present { background: #f2b705; color: var(--ink); border-color: #f2b705; font-weight: 800; }
 #stage.clean .pcap.right { left: auto; right: 56px; width: 900px; border-left: 0; border-right: 8px solid var(--accent); border-radius: 14px 0 0 14px; }

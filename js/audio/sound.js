@@ -169,7 +169,8 @@ export class Sound {
     if (!this.ctx) return;
     if (paused !== this.paused) { this.paused = paused; this.applyMaster(paused); }
     if (paused) return;
-    const t = this.ctx.currentTime;
+    // this.clock (opcional) dá o tempo do quadro: usado ao gravar o som do vídeo offline
+    const t = this.clock ? this.clock() : this.ctx.currentTime;
     const T = (param, v, tc = 0.06) => param.setTargetAtTime(v, t, tc);
     const e = st.eng, P = st.params;
     const rpm = e.rpm, rn = clamp(rpm / P.ratedRpm, 0, 1.2);

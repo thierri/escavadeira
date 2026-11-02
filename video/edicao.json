@@ -1,0 +1,41 @@
+{
+  "_leia": "Lista de edição do vídeo. Tempos em segundos do arquivo original (narracao.m4a), tirados da transcrição do Whisper. Depois de mudar algo aqui, rode: python video/tools/build.py",
+  "audio": "narracao.m4a",
+  "inicio": 5.2,
+  "fim": 597.9,
+  "pausas": { "maxima": 0.9, "alvo": 0.6, "limite_db": -38 },
+  "cortes": [
+    { "de": 19.6,   "ate": 22.2,   "motivo": "falso começo: 'E ele roda...' (apontado na revisão, 0:15)" },
+    { "de": 76.7,   "ate": 80.85,  "motivo": "repetição: 1ª tentativa de 'A cor de cada mangueira mostra a pressão do óleo'" },
+    { "de": 95.9,   "ate": 101.05, "motivo": "repetição: 1ª tentativa de 'e o roxo é o circuito de comando... já já'" },
+    { "de": 187.45, "ate": 190.2,  "motivo": "falso começo: 'Gira para...' (apontado na revisão, 2:44)" },
+    { "de": 199.0,  "ate": 200.85, "motivo": "falso começo: 'O acelerador...' (apontado na revisão, 2:55)" },
+    { "de": 291.3,  "ate": 301.45, "motivo": "repetição: 1ª tentativa de 'São 20 toneladas movidas por um líquido'" },
+    { "de": 315.6,  "ate": 337.3,  "motivo": "repetição: tentativas anteriores de 'Girando a chave...' e 'Dá pra ver os pistões...'" },
+    { "de": 349.9,  "ate": 360.2,  "motivo": "repetição: 1ª tentativa de 'O motor está ligado direto em duas bombas...'" },
+    { "de": 506.0,  "ate": 511.3,  "motivo": "repetição: 1ª tentativa de 'Cada esteira tem seu próprio motor' ('à roda de trás')" },
+    { "de": 542.0,  "ate": 547.7,  "motivo": "repetição: 1ª tentativa de 'E o botão de reforço de força sobe esse limite'" },
+    { "de": 550.95, "ate": 552.6,  "motivo": "valor errado: 'para 270 bar' (o certo é 373; o número aparece na legenda)" }
+  ],
+  "volume_maquina_db": -26,
+  "antecipar": 0.35,
+  "final": 2.5,
+  "cenas": [
+    { "cena": 0,  "inicio": 5.3,    "sync": [[5.3, 0.6], [22.3, 6.6], [39.9, 21.5]] },
+    { "cena": 1,  "inicio": 42.0,   "sync": [[42.0, 0.0], [44.1, 0.6], [46.8, 4.6], [50.68, 8.6], [54.02, 12.6], [57.0, 15.4]] },
+    { "cena": 2,  "inicio": 59.7,   "sync": [[59.7, 0.5], [62.88, 0.9], [64.72, 1.3], [66.02, 1.7], [67.22, 2.1], [68.56, 2.5], [70.44, 2.9], [71.62, 3.2], [72.44, 3.5], [73.08, 3.8], [74.46, 4.1], [76.0, 4.6], [80.92, 5.0], [105.78, 10.0], [114.16, 14.0], [122.94, 19.0], [128.2, 22.5]] },
+    { "cena": 3,  "inicio": 130.34, "sync": [[130.34, 0.4], [132.82, 3.0], [139.7, 3.9], [144.0, 8.0], [149.9, 12.6], [161.9, 18.0], [165.8, 18.8], [181.1, 31.0]] },
+    { "cena": 4,  "inicio": 183.56, "sync": [[183.56, 0.4], [185.42, 2.0], [190.3, 3.0], [192.24, 4.4], [200.9, 8.4], [208.5, 12.4], [212.5, 17.0], [219.3, 23.0], [226.6, 27.0], [232.8, 28.0]] },
+    { "cena": 5,  "inicio": 235.0,  "sync": [[235.0, 0.4], [243.1, 6.4], [252.2, 8.4], [255.7, 9.4], [259.8, 11.5], [267.3, 14.6], [281.8, 19.4], [287.2, 22.8]] },
+    { "cena": 6,  "inicio": 287.66, "sync": [[287.66, 0.3], [301.64, 3.0], [315.1, 12.0]] },
+    { "cena": 7,  "inicio": 337.44, "sync": [[337.44, 1.0], [339.0, 2.5], [342.48, 4.0], [360.38, 4.6], [368.6, 5.6], [372.9, 8.5], [376.2, 10.5], [381.6, 13.0], [386.7, 17.5]] },
+    { "cena": 8,  "inicio": 388.7,  "sync": [[388.7, 0.3], [396.9, 3.0], [405.6, 7.0], [410.0, 9.5], [414.7, 13.0]] },
+    { "cena": 9,  "inicio": 417.7,  "sync": [[417.7, 0.5], [427.2, 5.5], [434.2, 10.5], [440.8, 13.5], [444.5, 16.5]] },
+    { "cena": 10, "inicio": 446.8,  "sync": [[446.8, 1.5], [454.8, 5.0], [457.7, 7.0], [467.8, 11.5], [474.6, 14.5]] },
+    { "cena": 11, "inicio": 477.06, "sync": [[477.06, 0.3], [480.96, 1.5], [485.28, 4.5], [491.48, 7.6], [498.06, 12.6], [503.0, 17.5]] },
+    { "cena": 12, "inicio": 511.44, "sync": [[511.44, 0.5], [514.98, 1.5], [518.64, 5.5], [523.0, 9.3]] },
+    { "cena": 13, "inicio": 525.6,  "sync": [[525.6, 1.5], [531.0, 6.0], [547.78, 9.4], [554.3, 12.0], [557.4, 13.8]] },
+    { "cena": 14, "inicio": 557.78, "sync": [[557.78, 0.5], [560.5, 1.0], [564.8, 4.6], [568.38, 8.4], [572.64, 13.4], [574.8, 15.5], [578.2, 20.5]] },
+    { "cena": 15, "inicio": 580.72, "sync": [[580.72, 0.6]] }
+  ]
+}

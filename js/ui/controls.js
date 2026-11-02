@@ -213,6 +213,14 @@ export class Controls {
     };
     svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
   }
+  // joysticks, alavancas e chave em repouso (usado ao gravar o vídeo, cena a cena)
+  resetFx() {
+    for (const a in this.ax) this.ax[a] = 0;
+    for (const p of [this.padL, this.padR]) { p.x = 0; p.y = 0; p.drag = false; }
+    for (const l of [this.levL, this.levR]) { l.v = 0; l.drag = false; }
+    this.startHeld = false; this.boostHeld = false;
+    this.keyAng = this.keyPOS[this.st.key] ?? this.keyPOS[0];
+  }
   drawKey(st, dt) {
     const target = this.keyPOS[st.key] ?? 0;
     this.keyAng += (target - this.keyAng) * Math.min(1, dt * 16);

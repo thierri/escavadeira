@@ -29,7 +29,13 @@ Depois de editar, recarregue com Ctrl+F5 (o navegador pode guardar os módulos e
 - `js/render/scene.js`: toda a máquina. O SVG é criado uma vez em `build*()`, e a cada quadro só os atributos mudam.
 - `js/ui/controls.js`: joysticks, alavancas, teclado e controle → `st.input`. No modo apresentação o roteiro
   manda pelo `controls.override`.
-- `js/present/scenes.js`: roteiro das cenas (`moves`, `notes`, `focus` por `data-comp`).
+- `js/present/scenes.js`: roteiro das cenas (`moves`, `notes`, `focus` por `data-comp`, `spots`). São 15
+  cenas: a parte 1 (cenas 1–6) é um tour pela interface e a parte 2 (cenas 7–15) explica a máquina. O
+  roteiro de narração do vídeo está em [`docs/roteiro-video.md`](docs/roteiro-video.md); mude os dois juntos.
+- **Holofote** (`spots` nas cenas, `setSpot` em `presentation.js`): uma moldura que escurece o resto do palco
+  e aponta uma região. A região pode ser um nome (`'scene'`, `'panel'`, `'controls'`, `'topbar'`), um
+  retângulo `[x, y, w, h]` em px de 1920×1080, ou `{ sel, i, pad }`, medido do DOM. Os eventos das cenas
+  recebem `(st, params, app)`, e `app.setLayers` e `app.showDrawer` servem para demonstrar a interface.
 - `js/ui/info.js`: texto de cada peça clicável, indexado pelo `data-comp`.
 
 ## Coordenadas do desenho (scene.js)
@@ -84,6 +90,34 @@ st.key = 2; run(2.5, {}); st.key = 1; st.locked = false; st.throttle = 10; run(1
   Os quadros fixos ficam no `#overlay`. Volte com `'0 0 1400 784'`.
 - Não há testes automatizados nem Node instalado neste PC. Depois de editar, confira que o console não
   mostra erros.
+
+## Vídeo narrado (pasta `video/`)
+
+O vídeo é a apresentação gravada quadro a quadro pelo **HyperFrames** (HeyGen), com a narração do usuário.
+
+- `narracao.m4a` (raiz): gravação original. `video/edicao.json` é a lista de edição: início/fim, `cortes`
+  (repetições e erros, cada um com o motivo), encurtamento automático de pausas e, por cena, `inicio` e
+  `sync` (`[tempo no áudio original, tempo do roteiro]`). Os tempos vêm da transcrição do Whisper.
+- `python -I -X utf8 video/tools/build.py`: corta o áudio (ffmpeg) e gera `video/project/` (projeto
+  HyperFrames, gerado; não editar à mão). `video/tools/transcribe.py` transcreve com faster-whisper.
+  `video/tools/mapear.py --orig t` converte o tempo do original para o tempo do vídeo; sem `--orig`, mostra
+  as palavras do áudio limpo com o tempo no original.
+- `video/src/driver.js` liga o simulador ao HyperFrames (`registerFrameSource`). O simulador roda em modo
+  vídeo (`?video` ou `window.__VIDEO_MODE`): sem laço próprio, `sim.tick(dt, scriptDt)` por quadro,
+  `Math.random` com semente e `resetFx()` no começo de cada cena. Por isso qualquer quadro sai sempre igual.
+  Na sincronia, entre dois pontos o roteiro anda 1:1 e depois **espera** a fala. Durante a espera os
+  joysticks voltam ao centro, a menos que a cena tenha `segurarNaEspera: true`.
+- **Som da máquina**: o som do simulador é sintetizado ao vivo, então para o vídeo ele é gravado offline.
+  Rode `python video/tools/som.py` e abra `http://localhost:8770/index.html?audio`. A página simula o vídeo
+  inteiro num OfflineAudioContext (`sound.clock` dá o tempo de cada quadro; os sorteios do som usam uma
+  sequência própria, para a física ficar igual à da imagem) e envia `video/build/som-maquina.wav`. Depois
+  rode o `build.py`: ele abaixa a máquina sob a voz (sidechain) e cria a trilha `maquina`. O volume fica em
+  `volume_maquina_db` no `edicao.json`. **Grave o som de novo sempre que a edição ou as cenas mudarem.**
+- Studio para revisar: `.claude/launch.json` → `video` (ou `video\tools\preview.cmd`), em http://localhost:3002.
+  No Studio há dois iframes da composição; o mais recente é o de `_t` maior.
+- Render final: `npx hyperframes@0.9.3 render -o ../build/escavadeira.mp4`, dentro de `video/project`.
+  Ferramentas instaladas neste PC: Node em `C:\Program Files\nodejs`, ffmpeg via winget (Gyan.FFmpeg) e
+  faster-whisper (pip --user). No shell Bash, o PATH não tem node nem ffmpeg: exporte-os antes.
 
 ## Pendências conhecidas
 

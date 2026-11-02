@@ -15,3 +15,12 @@ Thumbs.db
 *.mov
 *.webm
 exports/
+
+# vídeo: arquivos gerados (refeitos por video/tools/build.py)
+video/build/
+video/project/
+
+# gravações de áudio (narração bruta e sons gerados)
+*.m4a
+*.wav
+*.mp3
